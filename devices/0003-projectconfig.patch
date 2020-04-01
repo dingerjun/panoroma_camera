@@ -1,0 +1,34 @@
+From 88e0433905bb328de92635f7d7f6f7828bc2cb1c Mon Sep 17 00:00:00 2001
+From: "erjun.ding" <dingerjun@gmail.com>
+Date: Sun, 7 May 2017 17:28:01 +0800
+Subject: [PATCH 3/3] projectconfig
+
+---
+ newmobi/newmobi6735_66t_v_l1/ProjectConfig.mk | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/newmobi/newmobi6735_66t_v_l1/ProjectConfig.mk b/newmobi/newmobi6735_66t_v_l1/ProjectConfig.mk
+index 208c506..009a218 100755
+--- a/newmobi/newmobi6735_66t_v_l1/ProjectConfig.mk
++++ b/newmobi/newmobi6735_66t_v_l1/ProjectConfig.mk
+@@ -20,7 +20,7 @@ CUSTOM_HAL_CAM_CAL = dummy_eeprom
+ CUSTOM_HAL_COMBO = mt6735
+ CUSTOM_HAL_EEPROM = dummy_eeprom
+ CUSTOM_HAL_FLASHLIGHT = dummy_flashlight
+-CUSTOM_HAL_IMGSENSOR = ov5648_mipi_raw ov2710_mipi_raw ov4689_mipi_raw
++CUSTOM_HAL_IMGSENSOR = ov4689_mipi_raw
+ CUSTOM_HAL_LENS = dummy_lens
+ CUSTOM_HAL_MAIN2_IMGSENSOR = ov4689_mipi_raw
+ CUSTOM_HAL_MAIN_BACKUP_IMGSENSOR =
+@@ -51,7 +51,7 @@ CUSTOM_KERNEL_LEDS = mt65xx
+ CUSTOM_KERNEL_LENS = dummy_lens
+ CUSTOM_KERNEL_MAGNETOMETER = yes
+ CUSTOM_KERNEL_MAIN2_BACKUP_IMGSENSOR =
+-CUSTOM_KERNEL_MAIN2_IMGSENSOR =
++CUSTOM_KERNEL_MAIN2_IMGSENSOR = ov4689_mipi_raw
+ CUSTOM_KERNEL_MAIN_BACKUP_IMGSENSOR =
+ CUSTOM_KERNEL_MAIN_BACKUP_LENS = 
+ CUSTOM_KERNEL_MAIN_IMGSENSOR = ov4689_mipi_raw
+-- 
+1.9.1
+

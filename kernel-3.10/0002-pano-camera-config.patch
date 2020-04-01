@@ -1,0 +1,3776 @@
+From 6e795ab06eea90653e566194ffb38e03e773098a Mon Sep 17 00:00:00 2001
+From: "erjun.ding" <dingerjun@gmail.com>
+Date: Sun, 7 May 2017 17:29:24 +0800
+Subject: [PATCH 2/2] pano camera config
+
+---
+ .../configs/newmobi6735_66t_v_l1_debug_defconfig   |    2 +-
+ arch/arm64/configs/newmobi6735_66t_v_l1_defconfig  |    2 +-
+ .../mediatek/imgsensor/src/mt6735/kd_sensorlist.c  |   32 +-
+ .../src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.c  | 3130 ++++++++------------
+ .../src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.h  |  214 +-
+ .../camera/camera/kd_camera_hw.c                   |   25 +-
+ .../camera/camera/kd_camera_hw.h                   |    2 +-
+ 7 files changed, 1323 insertions(+), 2084 deletions(-)
+
+diff --git a/arch/arm64/configs/newmobi6735_66t_v_l1_debug_defconfig b/arch/arm64/configs/newmobi6735_66t_v_l1_debug_defconfig
+index 79d2af8..fb3e59a 100755
+--- a/arch/arm64/configs/newmobi6735_66t_v_l1_debug_defconfig
++++ b/arch/arm64/configs/newmobi6735_66t_v_l1_debug_defconfig
+@@ -1045,7 +1045,7 @@ CONFIG_CUSTOM_KERNEL_HEART_RATE_SENSOR=""
+ CONFIG_CUSTOM_KERNEL_TILT_DETECTOR_SENSOR=""
+ CONFIG_CUSTOM_KERNEL_WAKE_GESTURE_SENSOR=""
+ CONFIG_CUSTOM_KERNEL_GLANCE_GESTURE_SENSOR=""
+-CONFIG_CUSTOM_KERNEL_IMGSENSOR="ov5648_mipi_raw ov2710_mipi_raw ov4689_mipi_raw"
++CONFIG_CUSTOM_KERNEL_IMGSENSOR="ov4689_mipi_raw"
+ CONFIG_CUSTOM_KERNEL_CAM_CAL_DRV=""
+ CONFIG_CUSTOM_KERNEL_LCM="hx8394d_hd720p_dsi_vdo ili9881c_hd720_dsi_vdo"
+ CONFIG_CUSTOM_KERNEL_FLASHLIGHT="constant_flashlight"
+diff --git a/arch/arm64/configs/newmobi6735_66t_v_l1_defconfig b/arch/arm64/configs/newmobi6735_66t_v_l1_defconfig
+index d4c1097..0d08403 100755
+--- a/arch/arm64/configs/newmobi6735_66t_v_l1_defconfig
++++ b/arch/arm64/configs/newmobi6735_66t_v_l1_defconfig
+@@ -1043,7 +1043,7 @@ CONFIG_CUSTOM_KERNEL_HEART_RATE_SENSOR=""
+ CONFIG_CUSTOM_KERNEL_TILT_DETECTOR_SENSOR=""
+ CONFIG_CUSTOM_KERNEL_WAKE_GESTURE_SENSOR=""
+ CONFIG_CUSTOM_KERNEL_GLANCE_GESTURE_SENSOR=""
+-CONFIG_CUSTOM_KERNEL_IMGSENSOR="ov5648_mipi_raw ov2710_mipi_raw ov4689_mipi_raw"
++CONFIG_CUSTOM_KERNEL_IMGSENSOR="ov4689_mipi_raw"
+ CONFIG_CUSTOM_KERNEL_CAM_CAL_DRV=""
+ CONFIG_CUSTOM_KERNEL_LCM="hx8394d_hd720p_dsi_vdo ili9881c_hd720_dsi_vdo"
+ CONFIG_CUSTOM_KERNEL_FLASHLIGHT="constant_flashlight"
+diff --git a/drivers/misc/mediatek/imgsensor/src/mt6735/kd_sensorlist.c b/drivers/misc/mediatek/imgsensor/src/mt6735/kd_sensorlist.c
+index e1a76a0..3eac973 100755
+--- a/drivers/misc/mediatek/imgsensor/src/mt6735/kd_sensorlist.c
++++ b/drivers/misc/mediatek/imgsensor/src/mt6735/kd_sensorlist.c
+@@ -296,13 +296,13 @@ int iReadReg(u16 a_u2Addr , u8 *a_puBuff , u16 i2cId)
+     /*  */
+     i4RetValue = i2c_master_send(g_pstI2Cclient, puReadCmd, 2);
+     if (i4RetValue != 2) {
+-        PK_ERR("[CAMERA SENSOR] I2C send failed, addr = 0x%x, data = 0x%x !!\n", a_u2Addr,  *a_puBuff);
++        PK_ERR("[CAMERA SENSOR] 1 I2C send failed, addr = 0x%x, data = 0x%x !!\n", a_u2Addr,  *a_puBuff);
+         return -1;
+     }
+     /*  */
+     i4RetValue = i2c_master_recv(g_pstI2Cclient, (char *)a_puBuff, 1);
+     if (i4RetValue != 1) {
+-        PK_ERR("[CAMERA SENSOR] I2C read failed!!\n");
++        PK_ERR("[CAMERA SENSOR] 1 I2C read failed!!\n");
+         return -1;
+     }
+     }
+@@ -319,13 +319,13 @@ int iReadReg(u16 a_u2Addr , u8 *a_puBuff , u16 i2cId)
+     /*  */
+     i4RetValue = i2c_master_send(g_pstI2Cclient2, puReadCmd, 2);
+     if (i4RetValue != 2) {
+-        PK_ERR("[CAMERA SENSOR] I2C send failed, addr = 0x%x, data = 0x%x !!\n", a_u2Addr,  *a_puBuff);
++        PK_ERR("[CAMERA SENSOR] 2 I2C send failed, addr = 0x%x, data = 0x%x !!\n", a_u2Addr,  *a_puBuff);
+         return -1;
+     }
+     /*  */
+     i4RetValue = i2c_master_recv(g_pstI2Cclient2, (char *)a_puBuff, 1);
+     if (i4RetValue != 1) {
+-        PK_ERR("[CAMERA SENSOR] I2C read failed!!\n");
++        PK_ERR("[CAMERA SENSOR] 2 I2C read failed!!\n");
+         return -1;
+     }
+     }
+@@ -719,7 +719,8 @@ MINT32 i = 0;
+         PK_XLOG_INFO("kd_MultiSensorOpen: switch I2C BUS%d\n", gI2CBusNum);
+         }
+ #else
+-        if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++        //if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++        if (DUAL_CAMERA_MAIN_2_SENSOR == g_invokeSocketIdx[i]) {
+         spin_lock(&kdsensor_drv_lock);
+         gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
+         spin_unlock(&kdsensor_drv_lock);
+@@ -746,8 +747,7 @@ MINT32 i = 0;
+         }
+         /* set i2c slave ID */
+         /* SensorOpen() will reset i2c slave ID */
+-        /* KD_SET_I2C_SLAVE_ID(i,g_invokeSocketIdx[i],IMGSENSOR_SET_I2C_ID_FORCE); */
+-    }
++        /* KD_SET_I2C_SLAVE_ID(i,g_invokeSocketIdx[i],IMGSENSOR_SET_I2C_ID_FORCE); */ }
+     }
+     }
+     KD_MULTI_FUNCTION_EXIT();
+@@ -856,7 +856,8 @@ MUINT32 *pFeatureParaLen)
+             PK_XLOG_INFO("kd_MultiSensorOpen: switch I2C BUS%d\n", gI2CBusNum);
+         }
+ #else
+-        if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++        //if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++        if (DUAL_CAMERA_MAIN_2_SENSOR == g_invokeSocketIdx[i]) {
+             spin_lock(&kdsensor_drv_lock);
+             gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
+             spin_unlock(&kdsensor_drv_lock);
+@@ -908,7 +909,8 @@ MSDK_SENSOR_CONFIG_STRUCT *pSensorConfigData)
+         PK_XLOG_INFO("kd_MultiSensorOpen: switch I2C BUS%d\n", gI2CBusNum);
+         }
+ #else
+-        if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++        //if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++        if (DUAL_CAMERA_MAIN_2_SENSOR == g_invokeSocketIdx[i]) {
+         spin_lock(&kdsensor_drv_lock);
+         gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
+         spin_unlock(&kdsensor_drv_lock);
+@@ -976,7 +978,8 @@ kd_MultiSensorClose(void)
+ #else
+ 
+ 
+-        if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++        //if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++        if (DUAL_CAMERA_MAIN_2_SENSOR == g_invokeSocketIdx[i]) {
+         spin_lock(&kdsensor_drv_lock);
+         gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
+         spin_unlock(&kdsensor_drv_lock);
+@@ -1036,6 +1039,9 @@ u32 i = 0;
+     if (g_bEnableDriver[i]) {
+         /* PK_XLOG_INFO("[%s][%d][%d][%s][%s]\r\n",__FUNCTION__,g_bEnableDriver[i],socketIdx[i],sensorNameStr[i],mode_name); */
+ #ifndef CONFIG_FPGA_EARLY_PORTING
++
++	printk(" \n  nick 000 kdModulePowerOn  sensorNameStr[%d]=%s \n",i,sensorNameStr[i]);
++
+         ret = kdCISModulePowerOn(socketIdx[i], sensorNameStr[i], On, mode_name);
+ #endif
+         if (ERROR_NONE != ret) {
+@@ -1086,7 +1092,8 @@ int kdSetDriver(unsigned int *pDrvIndex)
+             }
+ #else
+ 
+-    if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++    //if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
++        if (DUAL_CAMERA_MAIN_2_SENSOR == g_invokeSocketIdx[i]) {
+         spin_lock(&kdsensor_drv_lock);
+         gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
+         spin_unlock(&kdsensor_drv_lock);
+@@ -1145,7 +1152,8 @@ kdGetSocketPostion(unsigned int *pSocketPos) {
+         *pSocketPos = IMGSENSOR_SOCKET_POS_RIGHT;
+         break;
+     case DUAL_CAMERA_MAIN_2_SENSOR:
+-        *pSocketPos = IMGSENSOR_SOCKET_POS_LEFT;
++        //*pSocketPos = IMGSENSOR_SOCKET_POS_LEFT;
++        *pSocketPos = IMGSENSOR_SOCKET_POS_NONE;
+         break;
+     default:
+     case DUAL_CAMERA_SUB_SENSOR:
+diff --git a/drivers/misc/mediatek/imgsensor/src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.c b/drivers/misc/mediatek/imgsensor/src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.c
+index f401fb1..a1f2994 100755
+--- a/drivers/misc/mediatek/imgsensor/src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.c
++++ b/drivers/misc/mediatek/imgsensor/src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.c
+@@ -1,3 +1,23 @@
++/*****************************************************************************
++ *
++ * Filename:
++ * ---------
++ *	 OV2710mipi_Sensor.c
++ *
++ * Project:
++ * --------
++ *	 ALPS
++ *
++ * Description:
++ * ------------
++ *	 Source code of Sensor driver
++ *
++ *
++ *------------------------------------------------------------------------------
++ * Upper this line, this part is controlled by CC/CQ. DO NOT MODIFY!!
++ *============================================================================
++ ****************************************************************************/
++
+ #include <linux/videodev2.h>
+ #include <linux/i2c.h>
+ #include <linux/platform_device.h>
+@@ -6,1761 +26,1168 @@
+ #include <linux/uaccess.h>
+ #include <linux/fs.h>
+ #include <asm/atomic.h>
+-#include <asm/io.h>
+-//#include <asm/system.h>	 
++//#include <asm/system.h>
++#include <linux/xlog.h>
++
+ #include "kd_camera_hw.h"
+ #include "kd_imgsensor.h"
+ #include "kd_imgsensor_define.h"
+ #include "kd_imgsensor_errcode.h"
+ #include "kd_camera_feature.h"
+ #include "ov2710raw_Sensor.h"
+-#include "ov2710raw_Camera_Sensor_para.h"
+-#include "ov2710raw_CameraCustomized.h" 
+-
+-#define WMT_DEBUG
+-#define OV2710RAW_DEBUG
+-#ifdef OV2710RAW_DEBUG
+-#define OV2710SENSORDB printk
+-#else
+-#define OV2710SENSORDB(x,...)
+-#endif
+-#ifdef WMT_DEBUG
+-#define wmt_print printk
+-#else
+-#define wmt_print(x,...)
+-#endif
+-
+-int test_value=0;
+-
+-int enable_open_mutex = 0;
+-#define OPEN_MUTEX_NULL		(0)
+-#define OPEN_MUTEX_PREVIEW	(1)
+-#define OPEN_MUTEX_CAP		(1<<1)
+-int open_mutex=OPEN_MUTEX_NULL;
+-
+-static DEFINE_SPINLOCK(OV2710_drv_lock);
+-
+-extern int iReadReg(u16 a_u2Addr , u8 * a_puBuff , u16 i2cId);
+-extern int iWriteReg(u16 a_u2Addr , u32 a_u4Data , u32 a_u4Bytes , u16 i2cId);
+-
+-int ov2710_iWriteReg(u16 a_u2Addr , u32 a_u4Data , u32 a_u4Bytes , u16 i2cId)
+-{
+-	wmt_print("=x0===========================%s %d  %x %x\n",__func__,__LINE__,a_u2Addr ,  a_u4Data);
+-	return iWriteReg( a_u2Addr ,  a_u4Data ,  a_u4Bytes ,  i2cId);
+-}
+-
+-#define OV2710_write_cmos_sensor(addr, para) ov2710_iWriteReg((u16) addr , (u32) para ,1,OV2710_WRITE_ID)
+-
+-//#define OV2710_write_cmos_sensor(addr, para) iWriteReg((u16) addr , (u32) para ,1,OV2710_WRITE_ID)
+-#define mDELAY(ms)  mdelay(ms)
+-#define OV2710_TEST_PATTERN_CHECKSUM (0x1c936910)  // 0x7ba87eae
+-
+-static struct
+-{
+-	kal_uint8   IsPVmode;
+-	kal_uint32  PreviewDummyPixels;
+-	kal_uint32  PreviewDummyLines;
+-	kal_uint32  CaptureDummyPixels;
+-	kal_uint32  CaptureDummyLines;
+-	kal_uint32  PreviewPclk;
+-	kal_uint32  CapturePclk;
+-	kal_uint32  PreviewShutter;
+-	kal_uint32  SensorGain;
+-	kal_uint32  sceneMode;
+-	kal_uint32  SensorShutter;
+-	unsigned char 	isoSpeed;
+-	OV2710_SENSOR_MODE SensorMode;
+-} OV2710Sensor;
+-
+-static UINT16 WBcount = 0;
+-
+-MSDK_SENSOR_CONFIG_STRUCT OV2710SensorConfigData;
+-
+-
+-
+-
+-
+ 
++/****************************Modify Following Strings for Debug****************************/
++#define PFX "OV2710_camera_sensor"
++#define LOG_1 LOG_INF("OV2710,MIPI 1LANE\n")
++#define LOG_2 LOG_INF("preview 1920*1080@30fps,800Mbps/lane; video 1920*1080@30fps,800Mbps/lane; 1920*1080@30fps,800Mbps/lane\n")
++/****************************   Modify end    *******************************************/
++#define LOG_INF(format, args...)	pr_debug(PFX "[%s] " format, __FUNCTION__, ##args)
++
++static DEFINE_SPINLOCK(imgsensor_drv_lock);
++
++
++static imgsensor_info_struct imgsensor_info = { 
++	.sensor_id = 0x2710, //OV2710MIPI_SENSOR_ID,  /*sensor_id = 0x2710*/ //record sensor id defined in Kd_imgsensor.h
++	
++	.checksum_value = 0x92dcaca1, //checksum value for Camera Auto Test, 0x64d5ee2e
++	
++	.pre = {
++        	.pclk = 80000000,                                                              //record different mode's pclk
++		.linelength = 2898,                                                           //record different mode's linelength
++		.framelength = 1104,                                      //record different mode's framelength
++		.startx = 0,                                                                           //record different mode's startx of grabwindow
++		.starty = 0,                                                                           //record different mode's starty of grabwindow
++		.grabwindow_width = 1920,                        //record different mode's width of grabwindow
++		.grabwindow_height = 1080,                      //record different mode's height of grabwindow
++		                        /*           following for MIPIDataLowPwr2HighSpeedSettleDelayCount by different scenario          */
++		.mipi_data_lp2hs_settle_dc = 80,//unit , ns
++		                        /*           following for GetDefaultFramerateByScenario()               */
++		.max_framerate = 250, 
++            },
++
++	.cap = {/*normal capture*/
++		.pclk = 80000000,                                                              //record different mode's pclk
++		.linelength = 2898,                                                           //record different mode's linelength
++		.framelength = 1104,                                      //record different mode's framelength
++		.startx = 0,                                                                           //record different mode's startx of grabwindow
++		.starty = 0,                                                                           //record different mode's starty of grabwindow
++		.grabwindow_width = 1920,                        //record different mode's width of grabwindow
++		.grabwindow_height = 1080,                      //record different mode's height of grabwindow
++		                        /*           following for MIPIDataLowPwr2HighSpeedSettleDelayCount by different scenario          */
++		.mipi_data_lp2hs_settle_dc = 80,//unit , ns
++		                        /*           following for GetDefaultFramerateByScenario()               */
++		.max_framerate = 250, 
++	},
++	.cap1 = {/*PIP capture*/ //capture for PIP 24fps relative information, capture1 mode must use same framelength, linelength with Capture mode for shutter calculate
++		 .pclk = 80000000,                                                              //record different mode's pclk
++		.linelength = 2898,                                                           //record different mode's linelength
++		.framelength = 1104,                                      //record different mode's framelength
++		.startx = 0,                                                                           //record different mode's startx of grabwindow
++		.starty = 0,                                                                           //record different mode's starty of grabwindow
++		.grabwindow_width = 1920,                        //record different mode's width of grabwindow
++		.grabwindow_height = 1080,                      //record different mode's height of grabwindow
++		                        /*           following for MIPIDataLowPwr2HighSpeedSettleDelayCount by different scenario          */
++		.mipi_data_lp2hs_settle_dc = 80,//unit , ns
++		                        /*           following for GetDefaultFramerateByScenario()               */
++		.max_framerate = 250, 
++	},
++	.normal_video = {
++		.pclk = 80000000,                                                              //record different mode's pclk
++		.linelength = 2898,                                                           //record different mode's linelength
++		.framelength = 1104,                                      //record different mode's framelength
++		.startx = 0,                                                                           //record different mode's startx of grabwindow
++		.starty = 0,                                                                           //record different mode's starty of grabwindow
++		.grabwindow_width = 1920,                        //record different mode's width of grabwindow
++		.grabwindow_height = 1080,                      //record different mode's height of grabwindow
++		                        /*           following for MIPIDataLowPwr2HighSpeedSettleDelayCount by different scenario          */
++		.mipi_data_lp2hs_settle_dc = 80,//unit , ns
++		                        /*           following for GetDefaultFramerateByScenario()               */
++		.max_framerate = 250, 
++	},
++	.hs_video = {/*slow motion*/
++		.pclk = 80000000,                                                              //record different mode's pclk
++		.linelength = 2898,                                                           //record different mode's linelength
++		.framelength = 1104,                                      //record different mode's framelength
++		.startx = 0,                                                                           //record different mode's startx of grabwindow
++		.starty = 0,                                                                           //record different mode's starty of grabwindow
++		.grabwindow_width = 1920,                        //record different mode's width of grabwindow
++		.grabwindow_height = 1080,                      //record different mode's height of grabwindow
++		                        /*           following for MIPIDataLowPwr2HighSpeedSettleDelayCount by different scenario          */
++		.mipi_data_lp2hs_settle_dc = 80,//unit , ns
++		                        /*           following for GetDefaultFramerateByScenario()               */
++		.max_framerate = 250, 
++	},
++	.slim_video = {/*VT Call*/
++		.pclk = 80000000,                                                              //record different mode's pclk
++		.linelength = 2898,                                                           //record different mode's linelength
++		.framelength = 1104,                                      //record different mode's framelength
++		.startx = 0,                                                                           //record different mode's startx of grabwindow
++		.starty = 0,                                                                           //record different mode's starty of grabwindow
++		.grabwindow_width = 1920,                        //record different mode's width of grabwindow
++		.grabwindow_height = 1080,                      //record different mode's height of grabwindow
++		                        /*           following for MIPIDataLowPwr2HighSpeedSettleDelayCount by different scenario          */
++		.mipi_data_lp2hs_settle_dc = 80,//unit , ns
++		                        /*           following for GetDefaultFramerateByScenario()               */
++		.max_framerate = 250, 
++	},
++	
++	.margin = 4,			//sensor framelength & shutter margin
++	.min_shutter = 4,		//min shutter
++	.max_frame_length = 0x7fff,//max framelength by sensor register's limitation
++	.ae_shut_delay_frame = 0,	//shutter delay frame for AE cycle, 2 frame with ispGain_delay-shut_delay=2-0=2
++	.ae_sensor_gain_delay_frame = 1,//sensor gain delay frame for AE cycle,2 frame with ispGain_delay-sensor_gain_delay=2-0=2
++	.ae_ispGain_delay_frame = 2,//isp gain delay frame for AE cycle
++	.ihdr_support = 0,	  //1, support; 0,not support
++	.ihdr_le_firstline = 0,  //1,le first ; 0, se first
++	.sensor_mode_num = 5,	  //support sensor mode num
++	
++	.cap_delay_frame = 1,		//enter capture dDelay frame num
++	.pre_delay_frame = 2,		//enter preview delay frame num
++	.video_delay_frame = 1, 	//enter video delay frame num
++	.hs_video_delay_frame = 2,	//enter high speed video  delay frame num
++	.slim_video_delay_frame = 2,//enter slim video delay frame num
++	
++	.isp_driving_current = ISP_DRIVING_8MA, //mclk driving current
++	.sensor_interface_type = SENSOR_INTERFACE_TYPE_MIPI,//sensor_interface_type
++    .mipi_sensor_type = MIPI_OPHY_NCSI2, //0,MIPI_OPHY_NCSI2;  1,MIPI_OPHY_CSI2
++    .mipi_settle_delay_mode = MIPI_SETTLEDELAY_AUTO,//0,MIPI_SETTLEDELAY_AUTO; 1,MIPI_SETTLEDELAY_MANNUAL
++	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_B,//sensor output first pixel color
++	.mclk = 24,//mclk value, suggest 24 or 26 for 24Mhz or 26Mhz
++	.mipi_lane_num = SENSOR_MIPI_1_LANE,//mipi lane num
++	.i2c_addr_table = {0x6c, 0xff},//record sensor support all write id addr, only supprt 4must end with 0xff
++};
+ 
+ 
++static imgsensor_struct imgsensor = {
++	.mirror = IMAGE_HV_MIRROR,				//mirrorflip information
++	.sensor_mode = IMGSENSOR_MODE_INIT, //IMGSENSOR_MODE enum value,record current sensor mode,such as: INIT, Preview, Capture, Video,High Speed Video, Slim Video
++	.shutter = 0x3D0,					//current shutter
++	.gain = 0x010,						//current gain
++	.dummy_pixel = 0,					//current dummypixel
++	.dummy_line = 0,					//current dummyline
++    .current_fps = 250,  //full size current fps : 24fps for PIP, 30fps for Normal or ZSD
++	.autoflicker_en = KAL_FALSE,  //auto flicker enable: KAL_FALSE for disable auto flicker, KAL_TRUE for enable auto flicker
++	.test_pattern = KAL_FALSE,		//test pattern mode or not. KAL_FALSE for in test pattern mode, KAL_TRUE for normal output
++	.current_scenario_id = MSDK_SCENARIO_ID_CAMERA_PREVIEW,//current scenario id
++	.ihdr_en = 0, //sensor need support LE, SE with HDR feature
++	.i2c_write_id = 0x6c,//record current sensor's i2c write id
++};
+ 
+ 
++/* Sensor output window information */
++/*according to ov2710 datasheet p53 image cropping*/
++static SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[5] =
++{	{ 1920, 1080,	 0,    0, 1920, 1080, 1920,  1080, 0000, 0000, 1920,  1080, 	 0,    0, 1920,  1080}, // Preview 
++	{ 1920, 1080,	 0,    0, 1920, 1080, 1920,  1080, 0000, 0000, 1920,  1080, 	 0,    0, 1920,  1080}, // capture 
++	{ 1920, 1080,	 0,    0, 1920, 1080, 1920,  1080, 0000, 0000, 1920,  1080, 	 0,    0, 1920,  1080}, // video 
++	{ 1920, 1080,	 0,    0, 1920, 1080, 1920,  1080, 0000, 0000, 1920,  1080, 	 0,    0, 1920,  1080}, //hight speed video 
++	{ 1920, 1080,	 0,    0, 1920, 1080, 1920,  1080, 0000, 0000, 1920,  1080, 	 0,    0, 1920,  1080}};// slim video 
+ 
+ 
+-kal_uint16 OV2710_read_cmos_sensor(kal_uint32 addr)
++static kal_uint16 read_cmos_sensor(kal_uint32 addr)
+ {
+ 	kal_uint16 get_byte=0;
+-	
+-    iReadReg((u16)addr, (u8*)&get_byte, OV2710_WRITE_ID);
+ 
+-	wmt_print("============================%s %d  %x %x\n",__func__,__LINE__,addr ,  get_byte);
++	char pu_send_cmd[2] = {(char)(addr >> 8), (char)(addr & 0xFF) };
++	iReadRegI2C(pu_send_cmd, 2, (u8*)&get_byte, 1, imgsensor.i2c_write_id);
+ 
+-	
+-    return get_byte;
++	return get_byte;
+ }
+ 
+-
+-
+-
+-
+-
+-
+-
+-void ov2710_1280_720(void)
++static void write_cmos_sensor(kal_uint32 addr, kal_uint32 para)
+ {
+-	// mode_1280x720
+-	OV2710_write_cmos_sensor(0x3008, 0x82);
+-	mdelay(5);
+-	OV2710_write_cmos_sensor(0x3008, 0x02);
+-	mdelay(5);
+-	OV2710_write_cmos_sensor(0x3103, 0x93);
+-	OV2710_write_cmos_sensor(0x3017, 0x7f);
+-	OV2710_write_cmos_sensor(0x3018, 0xfc);
+-
+-	OV2710_write_cmos_sensor(0x3706, 0x61);
+-	OV2710_write_cmos_sensor(0x3712, 0x0c);
+-	OV2710_write_cmos_sensor(0x3630, 0x6d);
+-	OV2710_write_cmos_sensor(0x3801, 0xb4);
+-	OV2710_write_cmos_sensor(0x3621, 0x04);
+-	OV2710_write_cmos_sensor(0x3604, 0x60);
+-	OV2710_write_cmos_sensor(0x3603, 0xa7);
+-	OV2710_write_cmos_sensor(0x3631, 0x26);
+-	OV2710_write_cmos_sensor(0x3600, 0x04);
+-	OV2710_write_cmos_sensor(0x3620, 0x37);
+-	OV2710_write_cmos_sensor(0x3623, 0x00);
+-	OV2710_write_cmos_sensor(0x3702, 0x9e);
+-	OV2710_write_cmos_sensor(0x3703, 0x5c);
+-	OV2710_write_cmos_sensor(0x3704, 0x40);
+-	OV2710_write_cmos_sensor(0x370d, 0x0f);
+-	OV2710_write_cmos_sensor(0x3713, 0x9f);
+-	OV2710_write_cmos_sensor(0x3714, 0x4c);
+-	OV2710_write_cmos_sensor(0x3710, 0x9e);
+-	OV2710_write_cmos_sensor(0x3801, 0xc4);
+-	OV2710_write_cmos_sensor(0x3605, 0x05);
+-	OV2710_write_cmos_sensor(0x3606, 0x3f);
+-	OV2710_write_cmos_sensor(0x302d, 0x90);
+-	OV2710_write_cmos_sensor(0x370b, 0x40);
+-	OV2710_write_cmos_sensor(0x3716, 0x31);
+-	OV2710_write_cmos_sensor(0x380d, 0x74);
+-	OV2710_write_cmos_sensor(0x5181, 0x20);
+-	OV2710_write_cmos_sensor(0x518f, 0x00);
+-	OV2710_write_cmos_sensor(0x4301, 0xff);
+-	OV2710_write_cmos_sensor(0x4303, 0x00);
+-	OV2710_write_cmos_sensor(0x3a00, 0x78);
+-	OV2710_write_cmos_sensor(0x300f, 0x88);
+-	OV2710_write_cmos_sensor(0x3011, 0x28);
+-	OV2710_write_cmos_sensor(0x3a1a, 0x06);
+-	OV2710_write_cmos_sensor(0x3a18, 0x00);
+-	OV2710_write_cmos_sensor(0x3a19, 0x7a);
+-	OV2710_write_cmos_sensor(0x3a13, 0x54);
+-	OV2710_write_cmos_sensor(0x382e, 0x0f);
+-	OV2710_write_cmos_sensor(0x381a, 0x1a);
+-	OV2710_write_cmos_sensor(0x401d, 0x02);
+-	OV2710_write_cmos_sensor(0x381c, 0x10);
+-	OV2710_write_cmos_sensor(0x381d, 0xb8);
+-	OV2710_write_cmos_sensor(0x381e, 0x02);
+-	OV2710_write_cmos_sensor(0x381f, 0xdc);
+-	OV2710_write_cmos_sensor(0x3820, 0x0a);
+-	OV2710_write_cmos_sensor(0x3821, 0x29);
+-	OV2710_write_cmos_sensor(0x3804, 0x05);
+-	OV2710_write_cmos_sensor(0x3805, 0x00);
+-	OV2710_write_cmos_sensor(0x3806, 0x02);
+-	OV2710_write_cmos_sensor(0x3807, 0xd0);
+-	OV2710_write_cmos_sensor(0x3808, 0x05);
+-	OV2710_write_cmos_sensor(0x3809, 0x00);
+-	OV2710_write_cmos_sensor(0x380a, 0x02);
+-	OV2710_write_cmos_sensor(0x380b, 0xd0);
+-	OV2710_write_cmos_sensor(0x380e, 0x02);
+-	OV2710_write_cmos_sensor(0x380f, 0xe8);
+-	OV2710_write_cmos_sensor(0x380c, 0x07);
+-	OV2710_write_cmos_sensor(0x380d, 0x00);
+-	OV2710_write_cmos_sensor(0x5688, 0x03);
+-	OV2710_write_cmos_sensor(0x5684, 0x05);
+-	OV2710_write_cmos_sensor(0x5685, 0x00);
+-	OV2710_write_cmos_sensor(0x5686, 0x02);
+-	OV2710_write_cmos_sensor(0x5687, 0xd0);
+-	OV2710_write_cmos_sensor(0x3a08, 0x1b);
+-	OV2710_write_cmos_sensor(0x3a09, 0xe6);
+-	OV2710_write_cmos_sensor(0x3a0a, 0x17);
+-	OV2710_write_cmos_sensor(0x3a0b, 0x40);
+-	OV2710_write_cmos_sensor(0x3a0e, 0x01);
+-	OV2710_write_cmos_sensor(0x3a0d, 0x02);
+-	OV2710_write_cmos_sensor(0x3011, 0x0a);
+-	OV2710_write_cmos_sensor(0x300f, 0x8a);
+-	OV2710_write_cmos_sensor(0x3017, 0x00);
+-	OV2710_write_cmos_sensor(0x3018, 0x00);
+-
+-	OV2710_write_cmos_sensor(0x4803, 0x50); /* MIPI CTRL3 pg 91 */
+-	OV2710_write_cmos_sensor(0x4800, 0x24); /* MIPI CTRl0 idle and short line pg 89 */
+-
+-	OV2710_write_cmos_sensor(0x300e, 0x00);
+-	OV2710_write_cmos_sensor(0x4801, 0x0f);
+-	OV2710_write_cmos_sensor(0x300f, 0xc3);//c3
+-	OV2710_write_cmos_sensor(0x3a0f, 0x40);
+-	OV2710_write_cmos_sensor(0x3a10, 0x38);
+-	OV2710_write_cmos_sensor(0x3a1b, 0x48);
+-	OV2710_write_cmos_sensor(0x3a1e, 0x30);
+-	OV2710_write_cmos_sensor(0x3a11, 0x90);
+-	OV2710_write_cmos_sensor(0x3a1f, 0x10);
+-
+-	OV2710_write_cmos_sensor(0x3010, 0x10);
+-	OV2710_write_cmos_sensor(0x3a0e, 0x02);
+-	OV2710_write_cmos_sensor(0x3a0d, 0x03);
+-	OV2710_write_cmos_sensor(0x3a08, 0x0d);
+-	OV2710_write_cmos_sensor(0x3a09, 0xf3);
+-	OV2710_write_cmos_sensor(0x3a0a, 0x0b);
+-	OV2710_write_cmos_sensor(0x3a0b, 0xa0);
++	char pu_send_cmd[3] = {(char)(addr >> 8), (char)(addr & 0xFF), (char)(para & 0xFF)};
++	iWriteRegI2C(pu_send_cmd, 3, imgsensor.i2c_write_id);
+ }
+ 
+-
+-
+-
+-
+-void ov2710_1920_1080(void)
++static void set_dummy()
+ {
++	LOG_INF("dummyline = %d, dummypixels = %d \n", imgsensor.dummy_line, imgsensor.dummy_pixel);
++	/* you can set dummy by imgsensor.dummy_line and imgsensor.dummy_pixel, or you can set dummy by imgsensor.frame_length and imgsensor.line_length */
++
++	/*  Add dummy pixels: */
++    /* 0x380c [0:4], 0x380d defines the PCLKs in one line of OV2710  */  
++    /* Add dummy lines:*/
++    /* 0x380e [0:1], 0x380f defines total lines in one frame of OV2710 */
++
++	write_cmos_sensor(0x380e, imgsensor.frame_length >> 8);
++	write_cmos_sensor(0x380f, imgsensor.frame_length & 0xFF);	  
++    write_cmos_sensor(0x380c, imgsensor.line_length >> 8);
++    write_cmos_sensor(0x380d, imgsensor.line_length & 0xFF);
++  
++}	/*	set_dummy  */
++
++static kal_uint32 return_sensor_id()
++{
++    return ((read_cmos_sensor(0x300A) << 8) | read_cmos_sensor(0x300B));
++}
++static void set_max_framerate(UINT16 framerate,kal_bool min_framelength_en)
++{
++	kal_int16 dummy_line;
++	kal_uint32 frame_length = imgsensor.frame_length;
++	//unsigned long flags;
+ 
+-	OV2710_write_cmos_sensor(0x3103,0x93);
+-	OV2710_write_cmos_sensor(0x3008,0x82);
+-	OV2710_write_cmos_sensor(0x3008,0x42);
+-	OV2710_write_cmos_sensor(0x3017,0x7f);
+-	OV2710_write_cmos_sensor(0x3018,0xfc);
+-	OV2710_write_cmos_sensor(0x3706,0x61);
+-	OV2710_write_cmos_sensor(0x3712,0x0c);
+-	OV2710_write_cmos_sensor(0x3630,0x6d);
+-	OV2710_write_cmos_sensor(0x3801,0xb4);
+-	OV2710_write_cmos_sensor(0x3621,0x04);
+-	OV2710_write_cmos_sensor(0x3604,0x60);
+-	OV2710_write_cmos_sensor(0x3603,0xa7);
+-	OV2710_write_cmos_sensor(0x3631,0x26);
+-	OV2710_write_cmos_sensor(0x3600,0x04);
+-	OV2710_write_cmos_sensor(0x3620,0x37);
+-	OV2710_write_cmos_sensor(0x3623,0x00);
+-	OV2710_write_cmos_sensor(0x3702,0x9e);
+-	OV2710_write_cmos_sensor(0x3703,0x5c);
+-	OV2710_write_cmos_sensor(0x3704,0x40);
+-	OV2710_write_cmos_sensor(0x370d,0x0f);
+-	OV2710_write_cmos_sensor(0x3713,0x9f);
+-	OV2710_write_cmos_sensor(0x3714,0x4c);
+-	OV2710_write_cmos_sensor(0x3710,0x9e);
+-	OV2710_write_cmos_sensor(0x3801,0xc4);
+-	OV2710_write_cmos_sensor(0x3605,0x05);
+-	OV2710_write_cmos_sensor(0x3606,0x3f);
+-	OV2710_write_cmos_sensor(0x302d,0x90);
+-	OV2710_write_cmos_sensor(0x370b,0x40);
+-	OV2710_write_cmos_sensor(0x3716,0x31);
+-	OV2710_write_cmos_sensor(0x3707,0x52);
+-	OV2710_write_cmos_sensor(0x380d,0x76);
+-	OV2710_write_cmos_sensor(0x5181,0x20);
+-	OV2710_write_cmos_sensor(0x518f,0x00);
+-	OV2710_write_cmos_sensor(0x4301,0xff);
+-	OV2710_write_cmos_sensor(0x4303,0x00);
+-	OV2710_write_cmos_sensor(0x3a00,0x78);
+-	OV2710_write_cmos_sensor(0x300f,0xc3);
+-	OV2710_write_cmos_sensor(0x3010,0x10);
+-
+-	OV2710_write_cmos_sensor(0x3012,0x02);
+-	OV2710_write_cmos_sensor(0x3A1A,0x06);
+-	OV2710_write_cmos_sensor(0x3A18,0x00);
+-	OV2710_write_cmos_sensor(0x3A19,0x7a);
+-	OV2710_write_cmos_sensor(0x3A13,0x54);
+-	OV2710_write_cmos_sensor(0x382E,0x0f);
+-	OV2710_write_cmos_sensor(0x381A,0x1a);
+-	OV2710_write_cmos_sensor(0x401D,0x02);
+-	OV2710_write_cmos_sensor(0x5688,0x03); 
+-	OV2710_write_cmos_sensor(0x5684,0x07); 
+-	OV2710_write_cmos_sensor(0x5685,0xa0); 
+-	OV2710_write_cmos_sensor(0x5686,0x04); 
+-	OV2710_write_cmos_sensor(0x5687,0x43); 
+-
+-	OV2710_write_cmos_sensor(0x3017,0x00); 
+-	OV2710_write_cmos_sensor(0x3018,0x00); 
+-	OV2710_write_cmos_sensor(0x300E,0x04);
+-	OV2710_write_cmos_sensor(0x4801,0x0f); 
+-	OV2710_write_cmos_sensor(0x3A0F,0x40);
+-	OV2710_write_cmos_sensor(0x3A10,0x38);
+-	OV2710_write_cmos_sensor(0x3A1B,0x48);
+-	OV2710_write_cmos_sensor(0x3A1E,0x30);
+-	OV2710_write_cmos_sensor(0x3A11,0x90);
+-	OV2710_write_cmos_sensor(0x3A1F,0x10);
+-
+-	
+-	OV2710_write_cmos_sensor(0x3401,0x00);
+-	OV2710_write_cmos_sensor(0x3402,0x04);
+-	OV2710_write_cmos_sensor(0x3403,0x00);
+-	OV2710_write_cmos_sensor(0x3404,0x04);
+-	OV2710_write_cmos_sensor(0x3405,0x00);
+-	OV2710_write_cmos_sensor(0x5001,0x4e);
+-	OV2710_write_cmos_sensor(0x5000,0x5f);
+-	OV2710_write_cmos_sensor(0x3008,0x02);
+-	OV2710_write_cmos_sensor(0x3A00,0x38);
+-	OV2710_write_cmos_sensor(0x3503,0x37);   
+-	OV2710_write_cmos_sensor(0x3011,0x1a);		
+-
+-	OV2710_write_cmos_sensor(0x3818, 0xe0);
+-	OV2710_write_cmos_sensor(0x3621,0x14);   
+-	OV2710_write_cmos_sensor(0x3803, 0x09);
+-
+-	OV2710_write_cmos_sensor(0x3400,0x04);
+-	OV2710_write_cmos_sensor(0x3401,0x00);
+-	OV2710_write_cmos_sensor(0x3402,0x04);
+-	OV2710_write_cmos_sensor(0x3403,0x00);
+-	OV2710_write_cmos_sensor(0x3404,0x04);
+-	OV2710_write_cmos_sensor(0x3405,0x00);
++	LOG_INF("framerate = %d, min framelength should enable = %d\n", framerate,min_framelength_en);
+    
+-	OV2710_write_cmos_sensor(0x5001,0x4e);//4e
+-	OV2710_write_cmos_sensor(0x5000,0x5f);
+-	OV2710_write_cmos_sensor(0x3008,0x02);
+-	OV2710_write_cmos_sensor(0x3A00,0x38);
+-	OV2710_write_cmos_sensor(0x3503,0x00);   
+-	OV2710_write_cmos_sensor(0x3011,0x28);//
+-	
++	frame_length = imgsensor.pclk / framerate * 10 / imgsensor.line_length;
++	spin_lock(&imgsensor_drv_lock);
++	imgsensor.frame_length = (frame_length > imgsensor.min_frame_length) ? frame_length : imgsensor.min_frame_length; 
++	imgsensor.dummy_line = imgsensor.frame_length - imgsensor.min_frame_length;
++    //dummy_line = frame_length - imgsensor.min_frame_length;
++	//if (dummy_line < 0)
++	//	imgsensor.dummy_line = 0;
++	//else
++	//	imgsensor.dummy_line = dummy_line;
++	//imgsensor.frame_length = frame_length + imgsensor.dummy_line;
++	if (imgsensor.frame_length > imgsensor_info.max_frame_length)
++	{
++		imgsensor.frame_length = imgsensor_info.max_frame_length;
++		imgsensor.dummy_line = imgsensor.frame_length - imgsensor.min_frame_length;
++	}
++	if (min_framelength_en)
++		imgsensor.min_frame_length = imgsensor.frame_length;
++	spin_unlock(&imgsensor_drv_lock);
++	set_dummy();
++}	/*	set_max_framerate  */
+ 
+-	OV2710_write_cmos_sensor(0x3818,0xe0);   
+-	OV2710_write_cmos_sensor(0x3621,0x14);
+-	OV2710_write_cmos_sensor(0x3803,0x09);//
+-	
+-#if 0	
+-
+-	//@@ MIPI-10bit_1920x1080_30fps
+-	OV2710_write_cmos_sensor(0x3103,0x03);
+-	OV2710_write_cmos_sensor(0x3008,0x82);
+-	OV2710_write_cmos_sensor(0x3017,0x7f);
+-	OV2710_write_cmos_sensor(0x3018,0xfc);
+-	OV2710_write_cmos_sensor(0x301a,0x7f);
+-	OV2710_write_cmos_sensor(0x301b,0xfc);
+-
+-	OV2710_write_cmos_sensor(0x3706,0x61);
+-	OV2710_write_cmos_sensor(0x3712,0x0c);
+-	OV2710_write_cmos_sensor(0x3630,0x6d);
+-	OV2710_write_cmos_sensor(0x3801,0xb4);
+-	OV2710_write_cmos_sensor(0x3621,0x04);
+-	OV2710_write_cmos_sensor(0x3604,0x60);
+-	OV2710_write_cmos_sensor(0x3603,0xa7);
+-	OV2710_write_cmos_sensor(0x3631,0x26);
+-	OV2710_write_cmos_sensor(0x3600,0x04);
+-	OV2710_write_cmos_sensor(0x3620,0x37);
+-	OV2710_write_cmos_sensor(0x3623,0x00);
+-	OV2710_write_cmos_sensor(0x3702,0x9e);
+-	OV2710_write_cmos_sensor(0x3703,0x74);
+-	OV2710_write_cmos_sensor(0x3704,0x10);
+-	OV2710_write_cmos_sensor(0x370d,0x07);
+-	OV2710_write_cmos_sensor(0x3713,0x8b);
+-	OV2710_write_cmos_sensor(0x3714,0x74);
+-	OV2710_write_cmos_sensor(0x3710,0x9e);
+-	OV2710_write_cmos_sensor(0x3801,0xc4);
+-	OV2710_write_cmos_sensor(0x3605,0x05);
+-	OV2710_write_cmos_sensor(0x3606,0x12);
+-	OV2710_write_cmos_sensor(0x302d,0x90);
+-	OV2710_write_cmos_sensor(0x370b,0x40);
+-	OV2710_write_cmos_sensor(0x380d,0x74);
+-	OV2710_write_cmos_sensor(0x5181,0x20);
+-	OV2710_write_cmos_sensor(0x518f,0x00);
+-	OV2710_write_cmos_sensor(0x4301,0xff);
+-	OV2710_write_cmos_sensor(0x4303,0x00);
+-	OV2710_write_cmos_sensor(0x3a00,0x78);
+-	OV2710_write_cmos_sensor(0x300f,0x88);
+-	OV2710_write_cmos_sensor(0x3011,0x28);
+-	OV2710_write_cmos_sensor(0x3a1a,0x06);
+-	OV2710_write_cmos_sensor(0x3a18,0x00);
+-	OV2710_write_cmos_sensor(0x3a19,0x7a);
+-	OV2710_write_cmos_sensor(0x3a13,0x54);
+-	OV2710_write_cmos_sensor(0x382e,0x0f);
+-	OV2710_write_cmos_sensor(0x381a,0x1a);
+-	OV2710_write_cmos_sensor(0x5688,0x03);
+-	OV2710_write_cmos_sensor(0x5684,0x07);
+-	OV2710_write_cmos_sensor(0x5685,0xa0);
+-	OV2710_write_cmos_sensor(0x5686,0x04);
+-	OV2710_write_cmos_sensor(0x5687,0x43);
+-	OV2710_write_cmos_sensor(0x3011,0x0a);
+-	OV2710_write_cmos_sensor(0x300f,0x8a);
+-	//OV2710_write_cmos_sensor(0x3017,0x00);
+-	//OV2710_write_cmos_sensor(0x3018,0x00);
+-	OV2710_write_cmos_sensor(0x300e,0x00);
+-	OV2710_write_cmos_sensor(0x4801,0x0f);
+-	OV2710_write_cmos_sensor(0x300f,0xc3);//c3
+-	OV2710_write_cmos_sensor(0x3a0f,0x40);
+-	OV2710_write_cmos_sensor(0x3a10,0x38);
+-	OV2710_write_cmos_sensor(0x3a1b,0x48);
+-	OV2710_write_cmos_sensor(0x3a1e,0x30);
+-	OV2710_write_cmos_sensor(0x3a11,0x90);
+-	OV2710_write_cmos_sensor(0x3a1f,0x10);
+-#endif
+-
+-   // //1080: 1920*1080@30fps
+-
+-#if 0
+-	OV2710_write_cmos_sensor(0x3103,0x93);
+-	OV2710_write_cmos_sensor(0x3008,0x82);
+-	OV2710_write_cmos_sensor(0x3008,0x42);
+-	OV2710_write_cmos_sensor(0x3017,0x7f);
+-	OV2710_write_cmos_sensor(0x3018,0xfc);
+-	OV2710_write_cmos_sensor(0x3706,0x61);
+-	OV2710_write_cmos_sensor(0x3712,0x0c);
+-	OV2710_write_cmos_sensor(0x3630,0x6d);
+-	OV2710_write_cmos_sensor(0x3801,0xb4);
+-	OV2710_write_cmos_sensor(0x3621,0x04);
+-	OV2710_write_cmos_sensor(0x3604,0x60);
+-	OV2710_write_cmos_sensor(0x3603,0xa7);
+-	OV2710_write_cmos_sensor(0x3631,0x26);
+-	OV2710_write_cmos_sensor(0x3600,0x04);
+-	OV2710_write_cmos_sensor(0x3620,0x37);
+-	OV2710_write_cmos_sensor(0x3623,0x00);
+-	OV2710_write_cmos_sensor(0x3702,0x9e);
+-	OV2710_write_cmos_sensor(0x3703,0x5c);
+-	OV2710_write_cmos_sensor(0x3704,0x40);
+-	OV2710_write_cmos_sensor(0x370d,0x0f);
+-	OV2710_write_cmos_sensor(0x3713,0x9f);
+-	OV2710_write_cmos_sensor(0x3714,0x4c);
+-	OV2710_write_cmos_sensor(0x3710,0x9e);
+-	OV2710_write_cmos_sensor(0x3801,0xc4);
+-	OV2710_write_cmos_sensor(0x3605,0x05);
+-	OV2710_write_cmos_sensor(0x3606,0x3f);
+-	OV2710_write_cmos_sensor(0x302d,0x90);
+-	OV2710_write_cmos_sensor(0x370b,0x40);
+-	OV2710_write_cmos_sensor(0x3716,0x31);
+-	OV2710_write_cmos_sensor(0x3707,0x52);
+-	OV2710_write_cmos_sensor(0x380d,0x74);//MADE BY 
+-	
+ 
+-	
+-	OV2710_write_cmos_sensor(0x5181,0x20);
+-	OV2710_write_cmos_sensor(0x518f,0x00);
+-	OV2710_write_cmos_sensor(0x4301,0xff);
+-	OV2710_write_cmos_sensor(0x4303,0x00);
+-	OV2710_write_cmos_sensor(0x3a00,0x78);
+-	OV2710_write_cmos_sensor(0x300f,0x88);
+-	OV2710_write_cmos_sensor(0x3010,0x00);//05 0x10 15fps 0x00,30fps
+-
+-	OV2710_write_cmos_sensor(0x3012,0x02);
+-	OV2710_write_cmos_sensor(0x3A1A,0x06);
+-	OV2710_write_cmos_sensor(0x3A18,0x00);
+-	OV2710_write_cmos_sensor(0x3A19,0x7a);
+-	OV2710_write_cmos_sensor(0x3A13,0x54);
+-	OV2710_write_cmos_sensor(0x382E,0x0f);
+-	OV2710_write_cmos_sensor(0x381A,0x1a);
+-	OV2710_write_cmos_sensor(0x401D,0x02);
+-
+-	OV2710_write_cmos_sensor(0x5688,0x03); 
+-	OV2710_write_cmos_sensor(0x5684,0x07); 
+-	OV2710_write_cmos_sensor(0x5685,0xa0); 
+-	OV2710_write_cmos_sensor(0x5686,0x04); 
+-	OV2710_write_cmos_sensor(0x5687,0x43); 
+-	OV2710_write_cmos_sensor(0x3A0F,0x40);
+-	OV2710_write_cmos_sensor(0x3A10,0x38);
+-	OV2710_write_cmos_sensor(0x3A1B,0x48);
+-	OV2710_write_cmos_sensor(0x3A1E,0x30);
+-	OV2710_write_cmos_sensor(0x3A11,0x90);
+-	OV2710_write_cmos_sensor(0x3A1F,0x10);
++static void set_shutter(kal_uint16 shutter)
++{
++    unsigned long flags;
++	kal_uint16 realtime_fps = 0;
++	kal_uint32 frame_length = 0;
++    spin_lock_irqsave(&imgsensor_drv_lock, flags);
++    imgsensor.shutter = shutter;
++    spin_unlock_irqrestore(&imgsensor_drv_lock, flags);
++	   
++	/* 0x3500, 0x3501, 0x3502 will increase VBLANK to get exposure larger than frame exposure */
++	/* AE doesn't update sensor gain at capture mode, thus extra exposure lines must be updated here. */
++	
++	/* OV Recommend Solution
++	*  if shutter bigger than frame_length, should extend frame length first
++	*/
++	
++	// if(shutter<1) shutter = 1; /*avoid 0*/
++	if (shutter < imgsensor_info.min_shutter) 
++		shutter = imgsensor_info.min_shutter;
++	spin_lock(&imgsensor_drv_lock);
++	if (shutter > imgsensor.min_frame_length - imgsensor_info.margin)		
++		imgsensor.frame_length = shutter + 4;
++	else
++		imgsensor.frame_length = imgsensor.min_frame_length;
++		
++	if (imgsensor.frame_length > 0x7fff)
++		imgsensor.frame_length = 0x7fff;
++	spin_unlock(&imgsensor_drv_lock);
++	//shutter = (shutter < imgsensor_info.min_shutter) ? imgsensor_info.min_shutter : shutter;
++	//shutter = (shutter > (imgsensor_info.max_frame_length - imgsensor_info.margin)) ? (imgsensor_info.max_frame_length - imgsensor_info.margin) : shutter;
+ 
++	// Extend frame length
++	write_cmos_sensor(0x380e, imgsensor.frame_length >> 8);
++	write_cmos_sensor(0x380f, imgsensor.frame_length & 0xFF);
++	// Update Shutter
++	write_cmos_sensor(0x3502, (shutter << 4) & 0xFF);
++	write_cmos_sensor(0x3501, (shutter >> 4) & 0xFF);	  
++	write_cmos_sensor(0x3500, (shutter >> 12) & 0x0F);	
++	printk("yanpengloglogloglog set_shutter = 0x%d, framelength = 0x%x\n", shutter,imgsensor.frame_length);
++	//LOG_INF("frame_length = %d ", frame_length);
+ 	
+-	OV2710_write_cmos_sensor(0x3400,0x04);
+-	OV2710_write_cmos_sensor(0x3401,0x00);
+-	OV2710_write_cmos_sensor(0x3402,0x04);
+-	OV2710_write_cmos_sensor(0x3403,0x00);
+-	OV2710_write_cmos_sensor(0x3404,0x04);
+-	OV2710_write_cmos_sensor(0x3405,0x00);
+-	
++}	/*	set_shutter */
+ 
+-   
+-	OV2710_write_cmos_sensor(0x5001,0x4e);//4e
+-	OV2710_write_cmos_sensor(0x5000,0x5f);
+-	OV2710_write_cmos_sensor(0x3008,0x02);
+-	OV2710_write_cmos_sensor(0x3A00,0x38);
+-	OV2710_write_cmos_sensor(0x3503,0x00);   
+-	OV2710_write_cmos_sensor(0x3011,0x28);//
+-	
+ 
+-	OV2710_write_cmos_sensor(0x3818,0xe0);   
+-	OV2710_write_cmos_sensor(0x3621,0x14);
+-	OV2710_write_cmos_sensor(0x3803,0x09);//
+-	#endif
+-	
+-}
+ 
++static kal_uint16 gain2reg(const kal_uint16 gain)
++{
+ 	
+-
+-
+-void ov2710_init(void){
+-	return;
+-
++	kal_uint16 reg_gain = 0x0000;
++	/*
++	reg_gain = ((gain / BASEGAIN) << 4) + ((gain % BASEGAIN) * 16 / BASEGAIN);
++	reg_gain = reg_gain & 0xFFFF;
++	*/
++	return (kal_uint16)reg_gain;
+ }
+ 
+-
+-kal_uint32 OV2710_gain_check(kal_uint32 gain)
++/*************************************************************************
++* FUNCTION
++*	set_gain
++*
++* DESCRIPTION
++*	This function is to set global gain to sensor.
++*
++* PARAMETERS
++*	iGain : sensor global gain(base: 0x40)
++*
++* RETURNS
++*	the actually gain set to sensor.
++*
++* GLOBALS AFFECTED
++*
++*************************************************************************/
++static kal_uint16 set_gain(kal_uint16 iGain)
+ {
+-	gain = (gain > OV2710_MAX_GAIN) ? OV2710_MAX_GAIN : gain;
+-	gain = (gain < OV2710_MIN_GAIN) ? OV2710_MIN_GAIN : gain;
+-
+-	return gain;
+-}
+-
+ 
+-
+-static void OV2710_set_AE_mode(kal_bool AE_enable)
++     kal_uint8 iReg = 0x00;
++	 //printk("yanpengloglogloglog set_gain iGain:%d\n",iGain);
++	 kal_uint16 temp_reg = 0;     
++
++
++	if(iGain < BASEGAIN) {
++			iReg =0;
++	}else if (iGain < 2 * BASEGAIN) {
++		//iReg = 0x00;
++      iReg = 16 * iGain / BASEGAIN - 16;
++  }else if (iGain < 4 * BASEGAIN) {
++      iReg |= 0x10;
++      iReg |= (8 *iGain / BASEGAIN - 16);
++  }else if (iGain < 8 * BASEGAIN) {
++      iReg |= 0x30;
++      iReg |= (4 * iGain / BASEGAIN - 16);
++  }else if (iGain < 16 * BASEGAIN) {
++      iReg |= 0x70;
++      iReg |= (2 * iGain / BASEGAIN - 16);
++  }else if(iGain < 32 * BASEGAIN) {
++      iReg |= 0xF0;
++      iReg |= (iGain / BASEGAIN - 16);
++  }
++  else {
++      iReg = 0xFF;
++  }
++    temp_reg = iReg &0xFF;
++  		
++	spin_lock(&imgsensor_drv_lock);
++	imgsensor.gain = temp_reg; 
++	spin_unlock(&imgsensor_drv_lock);
++	printk("yanpeng iGain = 0x%x , reg_gain = 0x%x\n ", iGain, temp_reg);
++    write_cmos_sensor(0x3212, 0x00);
++	write_cmos_sensor(0x350b, temp_reg&0xff);
++	write_cmos_sensor(0x350a, temp_reg>>8); 
++	write_cmos_sensor(0x3212, 0x10);
++	write_cmos_sensor(0x3212, 0xa0);   
++
++	printk("yanpeng the gain of 0x350b=0x%x,0x350a=0x%x\n",read_cmos_sensor(0x350b),read_cmos_sensor(0x350a));
++	
++	return iGain;
++
++}	/*	set_gain  */
++
++static void ihdr_write_shutter_gain(kal_uint16 le, kal_uint16 se, kal_uint16 gain)
+ {
+-    kal_uint8 AeTemp;
+-	wmt_print("fix seting sensor register %s %d\n",__func__,__LINE__);
++	LOG_INF("Warining:Do not supportIHDR, Return. le:0x%x, se:0x%x, gain:0x%x\n",le,se,gain);
+ 	//return;
+-
+-	AeTemp = OV2710_read_cmos_sensor(0x3503); 
+-
+-    if (AE_enable == KAL_TRUE)
+-    {
+-    	OV2710SENSORDB("[OV2710_set_AE_mode] enable\n");
++	
++	if (imgsensor.ihdr_en) {
+ 		
+-        OV2710_write_cmos_sensor(0x3503, (AeTemp & (~0x07)));
+-    }
+-    else
+-    {
+-    	OV2710SENSORDB("[OV2710_set_AE_mode] disable\n");
++		spin_lock(&imgsensor_drv_lock);
++			if (le > imgsensor.min_frame_length - imgsensor_info.margin)		
++				imgsensor.frame_length = le + imgsensor_info.margin;
++			else
++				imgsensor.frame_length = imgsensor.min_frame_length;
++			if (imgsensor.frame_length > imgsensor_info.max_frame_length)
++				imgsensor.frame_length = imgsensor_info.max_frame_length;
++			spin_unlock(&imgsensor_drv_lock);
++			if (le < imgsensor_info.min_shutter) le = imgsensor_info.min_shutter;
++			if (se < imgsensor_info.min_shutter) se = imgsensor_info.min_shutter;
++			
++			
++				// Extend frame length first
++				write_cmos_sensor(0x380e, imgsensor.frame_length >> 8);
++				write_cmos_sensor(0x380f, imgsensor.frame_length & 0xFF);
++
++		write_cmos_sensor(0x3502, (le << 4) & 0xFF);
++		write_cmos_sensor(0x3501, (le >> 4) & 0xFF);	 
++		write_cmos_sensor(0x3500, (le >> 12) & 0x0F);
+ 		
+-      	OV2710_write_cmos_sensor(0x3503, (AeTemp | 0x07));
+-    }
+-}
++		write_cmos_sensor(0x3508, (se << 4) & 0xFF); 
++		write_cmos_sensor(0x3507, (se >> 4) & 0xFF);
++		write_cmos_sensor(0x3506, (se >> 12) & 0x0F); 
+ 
++		//set_gain(gain);--->mark  by  yanpeng
++	}
+ 
++}
+ 
+-static void OV2710WriteShutter(kal_uint32 shutter)
++static void set_mirror_flip(kal_uint8 image_mirror)
+ {
+-	kal_uint32 extra_exposure_lines = 0;
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	OV2710SENSORDB("[OV2710WriteShutter] shutter=%d\n", shutter);
+-	
+-	if (OV2710Sensor.IsPVmode) 
+-	{
+-		if (shutter <= OV2710_PV_EXPOSURE_LIMITATION) 
+-			extra_exposure_lines = 0;
+-		else 
+-			extra_exposure_lines = shutter - OV2710_PV_EXPOSURE_LIMITATION;		
+-	}
+-	else 
+-	{
+-		if (shutter <= OV2710_FULL_EXPOSURE_LIMITATION) 
+-			extra_exposure_lines = 0;
+-		else 
+-			extra_exposure_lines = shutter - OV2710_FULL_EXPOSURE_LIMITATION;		
+-	}
+-	
+-	shutter *= 16;
+-	
+-	OV2710_write_cmos_sensor(0x3502, shutter & 0x00FF);          
+-	OV2710_write_cmos_sensor(0x3501, ((shutter & 0x0FF00) >>8));  
+-	OV2710_write_cmos_sensor(0x3500, ((shutter & 0xFF0000) >> 16));	
+-	
+-	if(extra_exposure_lines>0)
+-	{
+-		OV2710_write_cmos_sensor(0x3507, extra_exposure_lines & 0xFF);         
+-		OV2710_write_cmos_sensor(0x3506, (extra_exposure_lines & 0xFF00) >> 8); 
+-	}
+-	else
+-	{
+-		OV2710_write_cmos_sensor(0x3507, 0x00);        
+-		OV2710_write_cmos_sensor(0x3506, 0x00); 
++	LOG_INF("image_mirror = %d\n", image_mirror);
++
++	/********************************************************
++	   *
++	   *   0x3820[2] ISP Vertical flip
++	   *   0x3820[1] Sensor Vertical flip
++	   *
++	   *   0x3821[2] ISP Horizontal mirror
++	   *   0x3821[1] Sensor Horizontal mirror
++	   *
++	   *   ISP and Sensor flip or mirror register bit should be the same!!
++	   *
++	   ********************************************************/
++
++	switch (image_mirror) {
++		case IMAGE_NORMAL:
++			write_cmos_sensor(0x3008, 0x42);
++			write_cmos_sensor(0x3803, 0x0a);
++			write_cmos_sensor(0x3621, 0x04);
++			write_cmos_sensor(0x3818, 0x80);
++			write_cmos_sensor(0x3008, 0x02);
++			break;
++		case IMAGE_H_MIRROR:
++			write_cmos_sensor(0x3008, 0x42);
++			write_cmos_sensor(0x3803, 0x0a);
++			write_cmos_sensor(0x3621, 0x14);
++			write_cmos_sensor(0x3818, 0xc0);
++			write_cmos_sensor(0x3008, 0x02);
++			break;
++		case IMAGE_V_MIRROR:
++			write_cmos_sensor(0x3008, 0x42);
++			write_cmos_sensor(0x3803, 0x09);
++			write_cmos_sensor(0x3621, 0x04);
++			write_cmos_sensor(0x3818, 0xa0);
++			write_cmos_sensor(0x3008, 0x02);		
++			break;
++		case IMAGE_HV_MIRROR:
++			write_cmos_sensor(0x3008, 0x42);
++			write_cmos_sensor(0x3803, 0x09);
++			write_cmos_sensor(0x3621, 0x14);
++			write_cmos_sensor(0x3818, 0xe0);
++			write_cmos_sensor(0x3008, 0x02);
++			break;
++		default:
++			LOG_INF("Error image_mirror setting\n");
+ 	}
+-}   
+-
+-
++}
+ 
+-static void OV2710WriteSensorGain(kal_uint32 gain)
++/*************************************************************************
++* FUNCTION
++*	night_mode
++*
++* DESCRIPTION
++*	This function night mode of sensor.
++*
++* PARAMETERS
++*	bEnable: KAL_TRUE -> enable night mode, otherwise, disable night mode
++*
++* RETURNS
++*	None
++*
++* GLOBALS AFFECTED
++*
++*************************************************************************/
++static void night_mode(kal_bool enable)
+ {
+-	kal_uint16 temp_reg = 0;
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	OV2710SENSORDB("[OV2710WriteSensorGain] gain=%d\n", gain);
+-		
+-	gain = OV2710_gain_check(gain);
+-	temp_reg = gain&0xFF;
+-	
+-	OV2710_write_cmos_sensor(0x350B, temp_reg);
+-} 
+-
+-
+-
+-void OV2710_night_mode(kal_bool enable)
++	/*No Need to implement this function*/ 
++}	/*	night_mode	*/
++static void preview_setting(void)
+ {
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
++	write_cmos_sensor(0x3008,0x02);//stream on
+ 
+-	kal_uint16 night = OV2710_read_cmos_sensor(0x3A00); 
++	LOG_INF("E\n");
+ 	
+-	if (enable)
+-	{
+-		OV2710SENSORDB("[OV2710_night_mode] enable\n");
+-		
+-       	OV2710_write_cmos_sensor(0x3A00, night | 0x04); // 25fps-5fps
+-       	OV2710_write_cmos_sensor(0x3a02, 0x0e); 
+-      	OV2710_write_cmos_sensor(0x3a03, 0x70);                         
+-      	OV2710_write_cmos_sensor(0x3a14, 0x0e); 
+-      	OV2710_write_cmos_sensor(0x3a15, 0x70);                    
+-    }
+-	else
+-	{   
+-		OV2710SENSORDB("[OV2710_night_mode] disable\n");
+-		
+-       	OV2710_write_cmos_sensor(0x3A00, night | 0x04); //25fps-12.5fps               
+-      	OV2710_write_cmos_sensor(0x3a02, 0x07);
+-       	OV2710_write_cmos_sensor(0x3a03, 0x38);
+-     	OV2710_write_cmos_sensor(0x3a14, 0x07); 
+-      	OV2710_write_cmos_sensor(0x3a15, 0x38);
+-    }
+-}	
+-
+-
+-
+-void OV2710_set_contrast(UINT16 para)
+-{   
+-    OV2710SENSORDB("[OV2710_set_contrast]para=%d\n", para);
+-		wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-    switch (para)
+-    {
+-        case ISP_CONTRAST_HIGH:
+-			OV2710_write_cmos_sensor(0x3212, 0x00); 
+-           	OV2710_write_cmos_sensor(0x5080, 0x28);             
+-           	OV2710_write_cmos_sensor(0x5081, 0x28);                         
+-           	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-           	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-           	break;
+-        case ISP_CONTRAST_MIDDLE:
+-			OV2710_write_cmos_sensor(0x3212, 0x00);          
+-           	OV2710_write_cmos_sensor(0x5080, 0x20);             
+-           	OV2710_write_cmos_sensor(0x5081, 0x20);                        
+-           	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-           	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			break;
+-		case ISP_CONTRAST_LOW:
+-			OV2710_write_cmos_sensor(0x3212, 0x00);          
+-         	OV2710_write_cmos_sensor(0x5080, 0x18);             
+-          	OV2710_write_cmos_sensor(0x5081, 0x18);                        
+-          	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-          	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-           	break;
+-        default:
+-             break;
+-    }
+ }
++	/*	preview_setting  */
+ 
+-
+-
+-void OV2710_set_brightness(UINT16 para)
++static void sensor_init(void)
+ {
+-    OV2710SENSORDB("[OV5645MIPI_set_brightness]para=%d\n", para);
+-		wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-    switch (para)
+-    {
+-        case ISP_BRIGHT_HIGH:
+-        	OV2710_write_cmos_sensor(0x3212, 0x00); 
+-      		OV2710_write_cmos_sensor(0x3a0f, 0x50); 
+-           	OV2710_write_cmos_sensor(0x3a10, 0x48); 
+-           	OV2710_write_cmos_sensor(0x3a11, 0xa0);
+-          	OV2710_write_cmos_sensor(0x3a1b, 0x50); 
+-          	OV2710_write_cmos_sensor(0x3a1e, 0x48); 	   
+-           	OV2710_write_cmos_sensor(0x3a1f, 0x24);            
+-         	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-          	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-            break;
+-        case ISP_BRIGHT_MIDDLE:
+-    		OV2710_write_cmos_sensor(0x3212, 0x00); 
+-    	  	OV2710_write_cmos_sensor(0x3a0f, 0x38); 
+-          	OV2710_write_cmos_sensor(0x3a10, 0x30); 
+-           	OV2710_write_cmos_sensor(0x3a11, 0x70);
+-          	OV2710_write_cmos_sensor(0x3a1b, 0x38); 
+-          	OV2710_write_cmos_sensor(0x3a1e, 0x30); 	   
+-           	OV2710_write_cmos_sensor(0x3a1f, 0x18);            
+-           	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-        	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			break;
+-		case ISP_BRIGHT_LOW:
+-			OV2710_write_cmos_sensor(0x3212, 0x00); 
+-			OV2710_write_cmos_sensor(0x3a0f, 0x20); 
+-          	OV2710_write_cmos_sensor(0x3a10, 0x18); 
+-         	OV2710_write_cmos_sensor(0x3a11, 0x40);
+-           	OV2710_write_cmos_sensor(0x3a1b, 0x20); 
+-         	OV2710_write_cmos_sensor(0x3a1e, 0x18); 	   
+-         	OV2710_write_cmos_sensor(0x3a1f, 0x0c);             
+-           	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-       		OV2710_write_cmos_sensor(0x3212, 0xa0); 		
+-            break;
+-        default:
+-            break;
+-    }
+-}
++	LOG_INF("E\n");
++
++	//ov2710 1920*1080 30ps 10bit data mipi 800Mbps/lane
++	write_cmos_sensor(0x3103,0x93);
++	write_cmos_sensor(0x3008,0x82);
++	mdelay(5);                   
++
++	write_cmos_sensor(0x3008,0x42);//stream off
++	mdelay(5);                   
++
++	write_cmos_sensor(0x3017,0x7f);
++	write_cmos_sensor(0x3018,0xfc);
++	write_cmos_sensor(0x3706,0x61);
++	write_cmos_sensor(0x3712,0x0c);
++	write_cmos_sensor(0x3630,0x6d);
++	write_cmos_sensor(0x3801,0xb4);
++	write_cmos_sensor(0x3621,0x04);
++	write_cmos_sensor(0x3604,0x60);
++	write_cmos_sensor(0x3603,0xa7);
++	write_cmos_sensor(0x3631,0x26);
++	write_cmos_sensor(0x3600,0x04);
++	write_cmos_sensor(0x3620,0x37);
++	write_cmos_sensor(0x3623,0x00);
++	write_cmos_sensor(0x3702,0x9e);
++	write_cmos_sensor(0x3703,0x5c);
++	write_cmos_sensor(0x3704,0x40);
++	write_cmos_sensor(0x370d,0x0f);
++	write_cmos_sensor(0x3713,0x9f);
++	write_cmos_sensor(0x3714,0x4c);
++	write_cmos_sensor(0x3710,0x9e);
++	write_cmos_sensor(0x3801,0xc4);
++	write_cmos_sensor(0x3605,0x05);
++	write_cmos_sensor(0x3606,0x3f);
++	write_cmos_sensor(0x302d,0x90);
++	write_cmos_sensor(0x370b,0x40);
++	write_cmos_sensor(0x3716,0x31);
++	write_cmos_sensor(0x3707,0x52); 
++	write_cmos_sensor(0x380d,0x74);
++	write_cmos_sensor(0x5181,0x20);
++	write_cmos_sensor(0x518f,0x00);
++	write_cmos_sensor(0x4301,0xff);
++	write_cmos_sensor(0x4303,0x00);
++	write_cmos_sensor(0x3a00,0x00);
++	write_cmos_sensor(0x300f,0x88);
++	write_cmos_sensor(0x3011,0x28);
++	write_cmos_sensor(0x3a1a,0x06);
++	write_cmos_sensor(0x3a18,0x00);
++	write_cmos_sensor(0x3a19,0x7a);
++	write_cmos_sensor(0x3a13,0x54);
++	write_cmos_sensor(0x382e,0x0f);
++	write_cmos_sensor(0x381a,0x1a);
++	write_cmos_sensor(0x401d,0x02);
++	write_cmos_sensor(0x5688,0x03);
++	write_cmos_sensor(0x5684,0x07);
++	write_cmos_sensor(0x5685,0xa0);
++	write_cmos_sensor(0x5686,0x04);
++	write_cmos_sensor(0x5687,0x43);
++	write_cmos_sensor(0x3011,0x0a);
++	write_cmos_sensor(0x300f,0x8a);
++	write_cmos_sensor(0x3017,0x00);
++	write_cmos_sensor(0x3018,0x00);
++	write_cmos_sensor(0x300e,0x04);
++	write_cmos_sensor(0x300f,0xc3);
++	write_cmos_sensor(0x4801,0x0f);
++	write_cmos_sensor(0x3a0f,0x40);
++	write_cmos_sensor(0x3a10,0x38);
++	write_cmos_sensor(0x3a1b,0x48);
++	write_cmos_sensor(0x3a1e,0x30);
++	write_cmos_sensor(0x3a11,0x90);
++	write_cmos_sensor(0x3a1f,0x10);
++	write_cmos_sensor(0x380c,0x0b);
++	write_cmos_sensor(0x380d,0x52);
++	write_cmos_sensor(0x380e,0x04);
++	write_cmos_sensor(0x380f,0x50);
++
++	write_cmos_sensor(0x3503,0x03); 
++	write_cmos_sensor(0x3501,0x2e);
++	write_cmos_sensor(0x3502,0x00);
++	write_cmos_sensor(0x350b,0x10);             
++	write_cmos_sensor(0x5001,0x4e); /* close awb */  
++	write_cmos_sensor(0x3406,0x01);
++	write_cmos_sensor(0x3400,0x04);
++	write_cmos_sensor(0x3401,0x00);
++	write_cmos_sensor(0x3402,0x04);
++	write_cmos_sensor(0x3403,0x00);
++	write_cmos_sensor(0x3404,0x04);
++	write_cmos_sensor(0x3405,0x00);           
++	write_cmos_sensor(0x4000,0x05); /* modified blc */           
++	write_cmos_sensor(0x302c,0x00); /* drive capacity*/           
++	write_cmos_sensor(0x5000,0x5f); /* close lenc */   
++
++	write_cmos_sensor(0x3803,0x09);  /* mirror and flip on by jeff */
++	write_cmos_sensor(0x3621,0x14);
++	write_cmos_sensor(0x3818,0xe0);  
+ 
++	mdelay(5);
+ 
++	
++}	/*	sensor_init  */
+ 
+-void OV2710_set_saturation(UINT16 para)
+-{
+-	OV2710SENSORDB("[OV5645MIPI_set_saturation]para=%d\n", para);
+-		wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-    switch (para)
+-    {
+-        case ISP_SAT_HIGH:
+-			OV2710_write_cmos_sensor(0x3212, 0x00); 
+-			OV2710_write_cmos_sensor(0x5073, 0x1B);
+-            OV2710_write_cmos_sensor(0x5074, 0xd6); 
+-            OV2710_write_cmos_sensor(0x5075, 0xf2); 
+-            OV2710_write_cmos_sensor(0x5076, 0xf2); 
+-            OV2710_write_cmos_sensor(0x5077, 0xe7); 
+-            OV2710_write_cmos_sensor(0x5078, 0x0a); 
+-			OV2710_write_cmos_sensor(0x3212, 0x10); 
+-          	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-            break;
+-        case ISP_SAT_MIDDLE:
+-			OV2710_write_cmos_sensor(0x3212, 0x00); 
+-    	    OV2710_write_cmos_sensor(0x5073, 0x17);
+-            OV2710_write_cmos_sensor(0x5074, 0xb3); 
+-            OV2710_write_cmos_sensor(0x5075, 0xca); 
+-            OV2710_write_cmos_sensor(0x5076, 0xca); 
+-            OV2710_write_cmos_sensor(0x5077, 0xc1); 
+-            OV2710_write_cmos_sensor(0x5078, 0x09); 	
+-			OV2710_write_cmos_sensor(0x3212, 0x10); 
+-         	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			break;
+-		case ISP_SAT_LOW:
+-			OV2710_write_cmos_sensor(0x3212, 0x00); 
+-			OV2710_write_cmos_sensor(0x5073, 0x12);
+-            OV2710_write_cmos_sensor(0x5074, 0x8f); 
+-            OV2710_write_cmos_sensor(0x5075, 0xa1); 
+-            OV2710_write_cmos_sensor(0x5076, 0xa1); 
+-            OV2710_write_cmos_sensor(0x5077, 0x9a); 
+-            OV2710_write_cmos_sensor(0x5078, 0x07); 
+-			OV2710_write_cmos_sensor(0x3212, 0x10); 
+-          	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-            break;
+-        default:
+-			break;
+-    }
+-}
+ 
+ 
+ 
+-void OV2710_set_iso(UINT16 para)
++static void capture_setting(kal_uint16 curretfps)
+ {
+-	OV2710SENSORDB("[OV5645MIPI_set_iso]para=%d\n", para);
+-		wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-    spin_lock(&OV2710_drv_lock);
+-    OV2710Sensor.isoSpeed = para;
+-    spin_unlock(&OV2710_drv_lock);   
+-	
+-    switch (para)
+-    {
+-    	case AE_ISO_AUTO:
+-			OV2710_write_cmos_sensor(0x3a19, 0x38);
+-            break;
+-        case AE_ISO_100:
+-           	OV2710_write_cmos_sensor(0x3a19, 0x18);
+-            break;
+-        case AE_ISO_200:
+-			OV2710_write_cmos_sensor(0x3a19, 0x38);
+-            break;
+-        case AE_ISO_400:
+-      		OV2710_write_cmos_sensor(0x3a19, 0x58);
+-            break;
+-        default:
+-            break;
+-    }
++	LOG_INF("E! currefps:%d\n",curretfps);
++	preview_setting();
+ }
+ 
+-
+-
+-BOOL OV2710_set_param_exposure_for_HDR(UINT16 para)
++static void normal_video_setting(kal_uint16 currefps)
+ {
+-    kal_uint32 gain = 0, shutter = 0;
+-	
+-	OV2710SENSORDB("[OV2710_set_param_exposure_for_HDR]para=%d\n", para);
+-	
+-    OV2710_set_AE_mode(KAL_FALSE);
+-    
+-	gain = OV2710Sensor.SensorGain;
+-    shutter = OV2710Sensor.SensorShutter;
+-	
+-	switch (para)
+-	{
+-	   case AE_EV_COMP_20:	
+-       case AE_EV_COMP_10:	
+-		   gain =gain<<1;
+-           shutter = shutter<<1;   		
+-		 break;
+-	   case AE_EV_COMP_00:
+-		 break;
+-	   case AE_EV_COMP_n10: 
+-	   case AE_EV_COMP_n20:
+-		   gain = gain >> 1;
+-           shutter = shutter >> 1;
+-		 break;
+-	   default:
+-		 break;
+-	}
+-
+-    OV2710WriteSensorGain(gain);	
+-	OV2710WriteShutter(shutter);	
+-	
+-	return TRUE;
++	LOG_INF("E! currefps:%d\n",currefps);
++	preview_setting();
+ }
+-
+-
+-
+-void OV2710_set_scene_mode(UINT16 para)
++static void hs_video_setting()
+ {
+-	OV2710SENSORDB("[OV2710_set_scene_mode]para=%d\n", para);
+-	
+-	spin_lock(&OV2710_drv_lock);
+-	OV2710Sensor.sceneMode=para;
+-	spin_unlock(&OV2710_drv_lock);
+-	
+-    switch (para)
+-    { 
+-		case SCENE_MODE_NIGHTSCENE:
+-          	 OV2710_night_mode(KAL_TRUE); 
+-			 break;
+-        case SCENE_MODE_PORTRAIT:
+-        case SCENE_MODE_LANDSCAPE:
+-        case SCENE_MODE_SUNSET:
+-        case SCENE_MODE_SPORTS:	 
+-        case SCENE_MODE_HDR:
+-            break;
+-        case SCENE_MODE_OFF:
+-			OV2710_night_mode(KAL_FALSE);
+-			break;
+-        default:
+-            break;
+-    }
++	LOG_INF("E\n");
++	preview_setting();
+ }
+ 
++static void slim_video_setting()
++{
++	LOG_INF("E\n");
++	preview_setting();
++}
+ 
+ 
+-static void OV2710SetDummy(kal_uint32 dummy_pixels, kal_uint32 dummy_lines)
++/*************************************************************************
++* FUNCTION
++*	get_imgsensor_id
++*
++* DESCRIPTION
++*	This function get the sensor ID 
++*
++* PARAMETERS
++*	*sensorID : return the sensor ID 
++*
++* RETURNS
++*	None
++*
++* GLOBALS AFFECTED
++*
++*************************************************************************/
++static kal_uint32 get_imgsensor_id(UINT32 *sensor_id) 
+ {
+-	kal_uint32 temp_reg, temp_reg1, temp_reg2;
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	OV2710SENSORDB("[OV2710SetDummy] dummy_pixels=%d, dummy_lines=%d\n", dummy_pixels, dummy_lines);
+-	
+-	if (dummy_pixels > 0)
+-	{
+-		temp_reg1 = OV2710_read_cmos_sensor(0x380D);  
+-		temp_reg2 = OV2710_read_cmos_sensor(0x380C);  
+-		
+-		temp_reg = (temp_reg1 & 0xFF) | (temp_reg2 << 8);
+-		temp_reg += dummy_pixels;
+-	
+-		OV2710_write_cmos_sensor(0x380D, (temp_reg & 0xFF));        
+-		OV2710_write_cmos_sensor(0x380C, ((temp_reg & 0xFF00) >> 8));
++	kal_uint8 i = 0;
++	kal_uint8 retry_total = 1;
++	kal_uint8 retry_cnt = retry_total;
++	//sensor have two i2c address 0x6c 0x6d & 0x21 0x20, we should detect the module used i2c address
++	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
++		spin_lock(&imgsensor_drv_lock);
++		imgsensor.i2c_write_id = imgsensor_info.i2c_addr_table[i];
++		spin_unlock(&imgsensor_drv_lock);
++		do {
++            *sensor_id = return_sensor_id();
++			if (*sensor_id == imgsensor_info.sensor_id) {				
++				LOG_INF("i2c write id: 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id,*sensor_id);	  
++				return ERROR_NONE;
++			}	
++            LOG_INF("Read sensor id fail, write id: 0x%x, id: 0x%x\n", imgsensor.i2c_write_id,*sensor_id);
++			retry_cnt--;
++		} while(retry_cnt > 0);
++		i++;
++		retry_cnt = retry_total;
+ 	}
+-
+-	if (dummy_lines > 0)
+-	{
+-		temp_reg1 = OV2710_read_cmos_sensor(0x380F);    
+-		temp_reg2 = OV2710_read_cmos_sensor(0x380E);  
+-		
+-		temp_reg = (temp_reg1 & 0xFF) | (temp_reg2 << 8);
+-		temp_reg += dummy_lines;
+-	
+-		OV2710_write_cmos_sensor(0x380F, (temp_reg & 0xFF));        
+-		OV2710_write_cmos_sensor(0x380E, ((temp_reg & 0xFF00) >> 8)); 
++	if (*sensor_id != imgsensor_info.sensor_id) {
++		// if Sensor ID is not correct, Must set *sensor_id to 0xFFFFFFFF 
++		*sensor_id = 0xFFFFFFFF;
++		return ERROR_SENSOR_CONNECT_FAIL;
+ 	}
++	return ERROR_NONE;
+ }
+ 
+ 
+-
+-static kal_uint32 OV2710ReadShutter(void)
++/*************************************************************************
++* FUNCTION
++*	open
++*
++* DESCRIPTION
++*	This function initialize the registers of CMOS sensor
++*
++* PARAMETERS
++*	None
++*
++* RETURNS
++*	None
++*
++* GLOBALS AFFECTED
++*
++*************************************************************************/
++static kal_uint32 open(void)
+ {
+-	kal_uint16 temp_reg1, temp_reg2 ,temp_reg3;
++	//const kal_uint8 i2c_addr[] = {IMGSENSOR_WRITE_ID_1, IMGSENSOR_WRITE_ID_2};
++	kal_uint8 i = 0;
++	kal_uint8 retry = 2;
++    kal_uint32 sensor_id = 0;
++    LOG_1;
++    LOG_2;
++	printk("zengyang open!!!!!!!!!!!!!!!!!!!!!!!/n");
++	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
++		spin_lock(&imgsensor_drv_lock);
++		imgsensor.i2c_write_id = imgsensor_info.i2c_addr_table[i];
++		spin_unlock(&imgsensor_drv_lock);
++		do {
++            sensor_id = return_sensor_id();
++			if (sensor_id == imgsensor_info.sensor_id) {				
++				LOG_INF("i2c write id: 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id,sensor_id);	  
++				break;
++			}	
++            LOG_INF("Read sensor id fail, write id: 0x%x, id: 0x%x\n", imgsensor.i2c_write_id,sensor_id);
++			retry--;
++		} while(retry > 0);
++		i++;
++		if (sensor_id == imgsensor_info.sensor_id)
++			break;
++		retry = 2;
++	}		 
++	if (imgsensor_info.sensor_id != sensor_id)
++		return ERROR_SENSOR_CONNECT_FAIL;
++	
++	/* initail sequence write in  */
++	sensor_init();
++
++	spin_lock(&imgsensor_drv_lock);
++
++	imgsensor.autoflicker_en= KAL_FALSE;
++	imgsensor.sensor_mode = IMGSENSOR_MODE_INIT;
++	imgsensor.shutter = 0x3D0;
++	imgsensor.gain = 0x000;
++	imgsensor.pclk = imgsensor_info.pre.pclk;
++	imgsensor.frame_length = imgsensor_info.pre.framelength;
++	imgsensor.line_length = imgsensor_info.pre.linelength;
++	imgsensor.min_frame_length = imgsensor_info.pre.framelength;
++	imgsensor.dummy_pixel = 0;
++	imgsensor.dummy_line = 0;
++	imgsensor.ihdr_en = 0;
++	imgsensor.test_pattern = 1;
++	imgsensor.current_fps = imgsensor_info.pre.max_framerate;
++	spin_unlock(&imgsensor_drv_lock);
+ 
+-		wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
++	return ERROR_NONE;
++}	/*	open  */
++
++
++
++/*************************************************************************
++* FUNCTION
++*	close
++*
++* DESCRIPTION
++*	
++*
++* PARAMETERS
++*	None
++*
++* RETURNS
++*	None
++*
++* GLOBALS AFFECTED
++*
++*************************************************************************/
++static kal_uint32 close(void)
++{
++    printk("zengyang   close!!!!!!!!!!!!\n");
+ 
++	/*No Need to implement this function*/ 
+ 	
+-	temp_reg1 = OV2710_read_cmos_sensor(0x3500);   
+-	temp_reg2 = OV2710_read_cmos_sensor(0x3501);  
+-	temp_reg3 = OV2710_read_cmos_sensor(0x3502); 
+-
+-	spin_lock(&OV2710_drv_lock);
+-	OV2710Sensor.PreviewShutter  = (temp_reg1 << 12)| (temp_reg2 << 4)|(temp_reg3 >> 4);
+-	spin_unlock(&OV2710_drv_lock);
++	return ERROR_NONE;
++}	/*	close  */
++
++
++/*************************************************************************
++* FUNCTION
++* preview
++*
++* DESCRIPTION
++*	This function start the sensor preview.
++*
++* PARAMETERS
++*	*image_window : address pointer of pixel numbers in one period of HSYNC
++*  *sensor_config_data : address pointer of line numbers in one period of VSYNC
++*
++* RETURNS
++*	None
++*
++* GLOBALS AFFECTED
++*
++*************************************************************************/
++static kal_uint32 preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
++					  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
++{
++	LOG_INF("E\n");
++	printk("zengyang preview!!!!!!!!!!!!!!!!!!!!!!!/n");
++	spin_lock(&imgsensor_drv_lock);
++	imgsensor.sensor_mode = IMGSENSOR_MODE_PREVIEW;
++	imgsensor.pclk = imgsensor_info.pre.pclk;
++	//imgsensor.video_mode = KAL_FALSE;
++	imgsensor.line_length = imgsensor_info.pre.linelength;
++	imgsensor.frame_length = imgsensor_info.pre.framelength; 
++	imgsensor.min_frame_length = imgsensor_info.pre.framelength;
++	imgsensor.autoflicker_en = KAL_FALSE;
++	spin_unlock(&imgsensor_drv_lock);
++	preview_setting();
++	return ERROR_NONE;
++}	/*	preview   */
++
++/*************************************************************************
++* FUNCTION
++*	capture
++*
++* DESCRIPTION
++*	This function setup the CMOS sensor in capture MY_OUTPUT mode
++*
++* PARAMETERS
++*
++* RETURNS
++*	None
++*
++* GLOBALS AFFECTED
++*
++*************************************************************************/
++static kal_uint32 capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
++						  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
++{
++	LOG_INF("E\n");
++	spin_lock(&imgsensor_drv_lock);
++	imgsensor.sensor_mode = IMGSENSOR_MODE_CAPTURE;
++    if (imgsensor.current_fps == imgsensor_info.cap1.max_framerate) {//PIP capture: 24fps for less than 13M, 20fps for 16M,15fps for 20M
++        imgsensor.pclk = imgsensor_info.cap1.pclk;
++        imgsensor.line_length = imgsensor_info.cap1.linelength;
++        imgsensor.frame_length = imgsensor_info.cap1.framelength;
++        imgsensor.min_frame_length = imgsensor_info.cap1.framelength;
++        imgsensor.autoflicker_en = KAL_FALSE;
++    } else {
++        if (imgsensor.current_fps != imgsensor_info.cap.max_framerate)
++            LOG_INF("Warning: current_fps %d fps is not support, so use cap's setting: %d fps!\n",imgsensor.current_fps,imgsensor_info.cap.max_framerate/10);
++	imgsensor.pclk = imgsensor_info.cap.pclk;
++	imgsensor.line_length = imgsensor_info.cap.linelength;
++	imgsensor.frame_length = imgsensor_info.cap.framelength;  
++	imgsensor.min_frame_length = imgsensor_info.cap.framelength;
++	imgsensor.autoflicker_en = KAL_FALSE;
++    }
++	spin_unlock(&imgsensor_drv_lock);
++	//capture_setting(imgsensor.current_fps);
++	mdelay(10);
++	return ERROR_NONE;
++}	/* capture() */
++static kal_uint32 normal_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
++					  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
++{
++	LOG_INF("E\n");
++	
++	spin_lock(&imgsensor_drv_lock);
++	imgsensor.sensor_mode = IMGSENSOR_MODE_VIDEO;
++	imgsensor.pclk = imgsensor_info.normal_video.pclk;
++	imgsensor.line_length = imgsensor_info.normal_video.linelength;
++	imgsensor.frame_length = imgsensor_info.normal_video.framelength;  
++	imgsensor.min_frame_length = imgsensor_info.normal_video.framelength;
++	//imgsensor.current_fps = 300;
++	imgsensor.autoflicker_en = KAL_FALSE;
++	spin_unlock(&imgsensor_drv_lock);
++	normal_video_setting(imgsensor.current_fps);
++	return ERROR_NONE;
++}	/*	normal_video   */
+ 
+-	OV2710SENSORDB("[OV2710ReadShutter] shutter=%d\n", OV2710Sensor.PreviewShutter);
++static kal_uint32 hs_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
++					  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
++{
++	LOG_INF("E\n");
++	
++	spin_lock(&imgsensor_drv_lock);
++	imgsensor.sensor_mode = IMGSENSOR_MODE_HIGH_SPEED_VIDEO;
++	imgsensor.pclk = imgsensor_info.hs_video.pclk;
++	//imgsensor.video_mode = KAL_TRUE;
++	imgsensor.line_length = imgsensor_info.hs_video.linelength;
++	imgsensor.frame_length = imgsensor_info.hs_video.framelength; 
++	imgsensor.min_frame_length = imgsensor_info.hs_video.framelength;
++	imgsensor.dummy_line = 0;
++	imgsensor.dummy_pixel = 0;
++	//imgsensor.current_fps = 600;
++	imgsensor.autoflicker_en = KAL_FALSE;
++	spin_unlock(&imgsensor_drv_lock);
++	hs_video_setting();
+ 	
+-	return OV2710Sensor.PreviewShutter;
+-}
+-
+-
++	return ERROR_NONE;
++}	/*	hs_video   */
+ 
+-static kal_uint32 OV2710ReadSensorGain(void)
++static kal_uint32 slim_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
++					  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
+ {
+-	kal_uint32 sensor_gain = 0;
+-			wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	sensor_gain=(OV2710_read_cmos_sensor(0x350B) & 0xFF); 		
+-
+-	OV2710SENSORDB("[OV2710ReadSensorGain] gain_350B=%d\n", sensor_gain);
+-
+-	return sensor_gain;
+-}  
+-
++	LOG_INF("E\n");
++	
++	spin_lock(&imgsensor_drv_lock);
++	imgsensor.sensor_mode = IMGSENSOR_MODE_SLIM_VIDEO;
++	imgsensor.pclk = imgsensor_info.slim_video.pclk;
++	//imgsensor.video_mode = KAL_TRUE;
++	imgsensor.line_length = imgsensor_info.slim_video.linelength;
++	imgsensor.frame_length = imgsensor_info.slim_video.framelength; 
++	imgsensor.min_frame_length = imgsensor_info.slim_video.framelength;
++	imgsensor.dummy_line = 0;
++	imgsensor.dummy_pixel = 0;
++	//imgsensor.current_fps = 1200;
++	imgsensor.autoflicker_en = KAL_FALSE;
++	spin_unlock(&imgsensor_drv_lock);
++	slim_video_setting();
++	
++	return ERROR_NONE;
++}	/*	slim_video	 */
+ 
+ 
+ 
+-static void OV2710_set_AWB_mode(kal_bool AWB_enable)
++static kal_uint32 get_resolution(MSDK_SENSOR_RESOLUTION_INFO_STRUCT *sensor_resolution)
+ {
+-    kal_uint8 AwbTemp;
+-		wmt_print("fix seting sensor register %s %d\n",__func__,__LINE__);
+-		//return;
+-
+-	AwbTemp = OV2710_read_cmos_sensor(0x3406);
+-
+-    if (AWB_enable == KAL_TRUE)
+-    {
+-    	OV2710SENSORDB("[OV2710_set_AWB_mode] enable\n");
+-		OV2710_write_cmos_sensor(0x3406, AwbTemp & 0xFE); 
+-    }
+-    else
+-    {
+-    	OV2710SENSORDB("[OV2710_set_AWB_mode] disable\n");
+-		OV2710_write_cmos_sensor(0x3406, AwbTemp | 0x01); 
+-    }
+-
+-}
++	LOG_INF("E\n");
++	sensor_resolution->SensorFullWidth = imgsensor_info.cap.grabwindow_width;
++	sensor_resolution->SensorFullHeight = imgsensor_info.cap.grabwindow_height;
++	
++	sensor_resolution->SensorPreviewWidth = imgsensor_info.pre.grabwindow_width;
++	sensor_resolution->SensorPreviewHeight = imgsensor_info.pre.grabwindow_height;
+ 
++	sensor_resolution->SensorVideoWidth = imgsensor_info.normal_video.grabwindow_width;
++	sensor_resolution->SensorVideoHeight = imgsensor_info.normal_video.grabwindow_height;		
+ 
++	
++	sensor_resolution->SensorHighSpeedVideoWidth	 = imgsensor_info.hs_video.grabwindow_width;
++	sensor_resolution->SensorHighSpeedVideoHeight	 = imgsensor_info.hs_video.grabwindow_height;
++	
++	sensor_resolution->SensorSlimVideoWidth	 = imgsensor_info.slim_video.grabwindow_width;
++	sensor_resolution->SensorSlimVideoHeight	 = imgsensor_info.slim_video.grabwindow_height;
++	return ERROR_NONE;
++}	/*	get_resolution	*/
+ 
+-BOOL OV2710_set_param_wb(UINT16 para)
++static kal_uint32 get_info(MSDK_SCENARIO_ID_ENUM scenario_id,
++					  MSDK_SENSOR_INFO_STRUCT *sensor_info,
++					  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
+ {
+-    //return TRUE;
+-
+-	OV2710SENSORDB("[OV2710_set_param_wb]para=%d\n", para);
+-	wmt_print("seting sensor register %s %d %d\n",__func__,__LINE__,para);
+-
+-    switch (para)
+-    {
+-        case AWB_MODE_OFF:
+-            OV2710_set_AWB_mode(KAL_FALSE);
+-            break;                    
+-        case AWB_MODE_AUTO:
+-            OV2710_set_AWB_mode(KAL_TRUE);
++	LOG_INF("scenario_id = %d\n", scenario_id);
++
++	
++	//sensor_info->SensorVideoFrameRate = imgsensor_info.normal_video.max_framerate/10; /* not use */
++	//sensor_info->SensorStillCaptureFrameRate= imgsensor_info.cap.max_framerate/10; /* not use */
++	//imgsensor_info->SensorWebCamCaptureFrameRate= imgsensor_info.v.max_framerate; /* not use */
++
++	sensor_info->SensorClockPolarity = SENSOR_CLOCK_POLARITY_LOW;
++	sensor_info->SensorClockFallingPolarity = SENSOR_CLOCK_POLARITY_LOW; /* not use */
++	sensor_info->SensorHsyncPolarity = SENSOR_CLOCK_POLARITY_LOW; // inverse with datasheet
++	sensor_info->SensorVsyncPolarity = SENSOR_CLOCK_POLARITY_LOW;
++	sensor_info->SensorInterruptDelayLines = 4; /* not use */
++	sensor_info->SensorResetActiveHigh = FALSE; /* not use */
++	sensor_info->SensorResetDelayCount = 5; /* not use */
++
++	sensor_info->SensroInterfaceType = imgsensor_info.sensor_interface_type;
++    sensor_info->MIPIsensorType = imgsensor_info.mipi_sensor_type;
++    sensor_info->SettleDelayMode = imgsensor_info.mipi_settle_delay_mode;
++
++	sensor_info->SensorOutputDataFormat = imgsensor_info.sensor_output_dataformat;
++
++	sensor_info->CaptureDelayFrame = imgsensor_info.cap_delay_frame; 
++	sensor_info->PreviewDelayFrame = imgsensor_info.pre_delay_frame; 
++	sensor_info->VideoDelayFrame = imgsensor_info.video_delay_frame;
++	sensor_info->HighSpeedVideoDelayFrame = imgsensor_info.hs_video_delay_frame;
++	sensor_info->SlimVideoDelayFrame = imgsensor_info.slim_video_delay_frame;
++
++	sensor_info->SensorMasterClockSwitch = 0; /* not use */
++	sensor_info->SensorDrivingCurrent = imgsensor_info.isp_driving_current;
++	
++	sensor_info->AEShutDelayFrame = imgsensor_info.ae_shut_delay_frame; 		 /* The frame of setting shutter default 0 for TG int */
++	sensor_info->AESensorGainDelayFrame = imgsensor_info.ae_sensor_gain_delay_frame;	/* The frame of setting sensor gain */
++	sensor_info->AEISPGainDelayFrame = imgsensor_info.ae_ispGain_delay_frame;	
++	sensor_info->IHDR_Support = imgsensor_info.ihdr_support;
++	sensor_info->IHDR_LE_FirstLine = imgsensor_info.ihdr_le_firstline;
++	sensor_info->SensorModeNum = imgsensor_info.sensor_mode_num;
++	
++	sensor_info->SensorMIPILaneNumber = imgsensor_info.mipi_lane_num; 
++	sensor_info->SensorClockFreq = imgsensor_info.mclk;
++	sensor_info->SensorClockDividCount = 3; /* not use */
++	sensor_info->SensorClockRisingCount = 0;
++	sensor_info->SensorClockFallingCount = 2; /* not use */
++	sensor_info->SensorPixelClockCount = 3; /* not use */
++	sensor_info->SensorDataLatchCount = 2; /* not use */
++	
++	sensor_info->MIPIDataLowPwr2HighSpeedTermDelayCount = 0; 
++	sensor_info->MIPICLKLowPwr2HighSpeedTermDelayCount = 0;
++	sensor_info->SensorWidthSampling = 0;  // 0 is default 1x
++	sensor_info->SensorHightSampling = 0;	// 0 is default 1x 
++	sensor_info->SensorPacketECCOrder = 1;
++
++	switch (scenario_id) {
++		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
++			sensor_info->SensorGrabStartX = imgsensor_info.pre.startx; 
++			sensor_info->SensorGrabStartY = imgsensor_info.pre.starty;		
++			
++			sensor_info->MIPIDataLowPwr2HighSpeedSettleDelayCount = imgsensor_info.pre.mipi_data_lp2hs_settle_dc;
++			
+ 			break;
+-        case AWB_MODE_CLOUDY_DAYLIGHT:
+-        	 OV2710_set_AWB_mode(KAL_FALSE); 
+-        	 OV2710_write_cmos_sensor(0x3212, 0x00); 
+-			 OV2710_write_cmos_sensor(0x3400, 0x06);
+-			 OV2710_write_cmos_sensor(0x3401, 0x30);
+-			 OV2710_write_cmos_sensor(0x3402, 0x04);
+-			 OV2710_write_cmos_sensor(0x3403, 0x00);
+-			 OV2710_write_cmos_sensor(0x3404, 0x04);
+-			 OV2710_write_cmos_sensor(0x3405, 0x30);
+-             OV2710_write_cmos_sensor(0x3212, 0x10); 
+-             OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-             break;	
+-        case AWB_MODE_DAYLIGHT:/*2*/
+-        	 OV2710_set_AWB_mode(KAL_FALSE); 
+-             OV2710_write_cmos_sensor(0x3212, 0x00);                           
+-			 OV2710_write_cmos_sensor(0x3400, 0x06);
+-			 OV2710_write_cmos_sensor(0x3401, 0x10);
+-			 OV2710_write_cmos_sensor(0x3402, 0x04);
+-			 OV2710_write_cmos_sensor(0x3403, 0x00);
+-			 OV2710_write_cmos_sensor(0x3404, 0x04);
+-			 OV2710_write_cmos_sensor(0x3405, 0x48);
+-             OV2710_write_cmos_sensor(0x3212, 0x10); 
+-             OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			 break;
+-        case AWB_MODE_INCANDESCENT:/*8*/
+-        	 OV2710_set_AWB_mode(KAL_FALSE); 
+-             OV2710_write_cmos_sensor(0x3212, 0x00); 
+-			 OV2710_write_cmos_sensor(0x3400, 0x04);
+-			 OV2710_write_cmos_sensor(0x3401, 0xe0);
+-			 OV2710_write_cmos_sensor(0x3402, 0x04);
+-			 OV2710_write_cmos_sensor(0x3403, 0x00);
+-			 OV2710_write_cmos_sensor(0x3404, 0x05);
+-			 OV2710_write_cmos_sensor(0x3405, 0xa0);
+-             OV2710_write_cmos_sensor(0x3212, 0x10); 
+-             OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			 break;
+-        case AWB_MODE_TUNGSTEN:/*9*/
+-			 OV2710_set_AWB_mode(KAL_FALSE); 
+-             OV2710_write_cmos_sensor(0x3212, 0x00);                           
+-             OV2710_write_cmos_sensor(0x3400, 0x05); 
+-             OV2710_write_cmos_sensor(0x3401, 0x48); 
+-			 OV2710_write_cmos_sensor(0x3402, 0x04);
+-			 OV2710_write_cmos_sensor(0x3403, 0x00);
+-             OV2710_write_cmos_sensor(0x3404, 0x05); 
+-             OV2710_write_cmos_sensor(0x3405, 0xe0);              
+-             OV2710_write_cmos_sensor(0x3212, 0x10); 
+-             OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			 break;
+-        case AWB_MODE_FLUORESCENT:/*6*/
+-			 OV2710_set_AWB_mode(KAL_FALSE); 
+-             OV2710_write_cmos_sensor(0x3212, 0x00);                                        
+-             OV2710_write_cmos_sensor(0x3400, 0x04); 
+-             OV2710_write_cmos_sensor(0x3401, 0x00); 
+-			 OV2710_write_cmos_sensor(0x3402, 0x04);
+-			 OV2710_write_cmos_sensor(0x3403, 0x00);
+-             OV2710_write_cmos_sensor(0x3404, 0x06); 
+-             OV2710_write_cmos_sensor(0x3405, 0x50);              
+-             OV2710_write_cmos_sensor(0x3212, 0x10); 
+-             OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			 break;
+-        default:
+-            return FALSE;
+-    }
+-
+-	spin_lock(&OV2710_drv_lock);
+-	WBcount= para;
+-	spin_unlock(&OV2710_drv_lock);
+-	
+-    return TRUE;
+-}
++		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
++			sensor_info->SensorGrabStartX = imgsensor_info.cap.startx; 
++			sensor_info->SensorGrabStartY = imgsensor_info.cap.starty;
++				  
++			sensor_info->MIPIDataLowPwr2HighSpeedSettleDelayCount = imgsensor_info.cap.mipi_data_lp2hs_settle_dc; 
+ 
++			break;	 
++		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
++			
++			sensor_info->SensorGrabStartX = imgsensor_info.normal_video.startx; 
++			sensor_info->SensorGrabStartY = imgsensor_info.normal_video.starty;
++	   
++			sensor_info->MIPIDataLowPwr2HighSpeedSettleDelayCount = imgsensor_info.normal_video.mipi_data_lp2hs_settle_dc; 
+ 
++			break;	  
++		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:			
++			sensor_info->SensorGrabStartX = imgsensor_info.hs_video.startx; 
++			sensor_info->SensorGrabStartY = imgsensor_info.hs_video.starty;
++				  
++			sensor_info->MIPIDataLowPwr2HighSpeedSettleDelayCount = imgsensor_info.hs_video.mipi_data_lp2hs_settle_dc; 
+ 
+-static kal_uint32 OV2710_GetSensorID(kal_uint32 *sensorID)
+-{
+-	volatile signed char i;
+-	kal_uint32 sensor_id=0;
+-	wmt_print("%s %s %d  1\n",__FILE__,__func__,__LINE__);
+-	OV2710_write_cmos_sensor(0x3008, 0x82);
+-	mDELAY(10);
+-	
+-	for(i=0;i<3;i++)
+-	{
+-		sensor_id = (OV2710_read_cmos_sensor(0x300A) << 8) | OV2710_read_cmos_sensor(0x300B);
+-		
+-		OV2710SENSORDB("[OV2710_GetSensorID] sensorID=%x\n", sensor_id);
++			break;
++		case MSDK_SCENARIO_ID_SLIM_VIDEO:
++			sensor_info->SensorGrabStartX = imgsensor_info.slim_video.startx; 
++			sensor_info->SensorGrabStartY = imgsensor_info.slim_video.starty;
++				  
++			sensor_info->MIPIDataLowPwr2HighSpeedSettleDelayCount = imgsensor_info.slim_video.mipi_data_lp2hs_settle_dc; 
+ 
+-		if(sensor_id != OV2710_SENSOR_ID)
+-		{	
+-			*sensorID =0xffffffff;
++			break;
++		default:			
++			sensor_info->SensorGrabStartX = imgsensor_info.pre.startx; 
++			sensor_info->SensorGrabStartY = imgsensor_info.pre.starty;		
+ 			
+-			return ERROR_SENSOR_CONNECT_FAIL;
+-		}
++			sensor_info->MIPIDataLowPwr2HighSpeedSettleDelayCount = imgsensor_info.pre.mipi_data_lp2hs_settle_dc;
++			break;
+ 	}
+ 	
+-	*sensorID = sensor_id;
+-		
+-    return ERROR_NONE;    
+-}   
++	return ERROR_NONE;
++}	/*	get_info  */
+ 
+- 
+ 
+-static void OV2710InitialSetting(void)
++static kal_uint32 control(MSDK_SCENARIO_ID_ENUM scenario_id, MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
++					  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
+ {
+-	OV2710SENSORDB("[OV2710InitialSetting]\n");
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
++	LOG_INF("scenario_id = %d\n", scenario_id);
++	spin_lock(&imgsensor_drv_lock);
++	imgsensor.current_scenario_id = scenario_id;
++	spin_unlock(&imgsensor_drv_lock);
++	switch (scenario_id) {
++		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
++			preview(image_window, sensor_config_data);
++			break;
++		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
++			capture(image_window, sensor_config_data);
++			break;	
++		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
++			normal_video(image_window, sensor_config_data);
++			break;	  
++		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
++			hs_video(image_window, sensor_config_data);
++			break;
++		case MSDK_SCENARIO_ID_SLIM_VIDEO:
++			slim_video(image_window, sensor_config_data);
++			break;	  
++		default:
++			LOG_INF("Error ScenarioId setting");
++			preview(image_window, sensor_config_data);
++			return ERROR_INVALID_SCENARIO_ID;
++	}
++	return ERROR_NONE;
++}	/* control() */
+ 
+ 
+-	ov2710_init();
+-	
+ 
+-	spin_lock(&OV2710_drv_lock);
+-	OV2710Sensor.IsPVmode = 1;
+-	OV2710Sensor.PreviewDummyPixels = 0;
+-	OV2710Sensor.PreviewDummyLines = 0;
+-	OV2710Sensor.PreviewPclk = PLCK_PREVIEW;
+-	OV2710Sensor.CapturePclk = PLCK_CAP;
+-	OV2710Sensor.SensorGain = 0x10;
+-	WBcount = AWB_MODE_AUTO;
+-	spin_unlock(&OV2710_drv_lock);
+-}                                  
+-
+-static void OV2710PreviewSetting(void)
++static kal_uint32 set_video_mode(UINT16 framerate)
+ {
+-	OV2710SENSORDB("[OV2710PreviewSetting]\n");
+-
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-	
+-	//ov2710_1280_720();
+-	ov2710_1920_1080();
+-
+-	spin_lock(&OV2710_drv_lock);
+-	OV2710Sensor.IsPVmode = KAL_TRUE;
+-	OV2710Sensor.PreviewPclk = PLCK_PREVIEW;
+-	OV2710Sensor.SensorMode = SENSOR_MODE_PREVIEW;
+-	spin_unlock(&OV2710_drv_lock);
+-
+-
+-
+-	msleep(100);
++	LOG_INF("framerate = %d\n ", framerate);
++	// SetVideoMode Function should fix framerate
++	if (framerate == 0)
++		// Dynamic frame rate
++		return ERROR_NONE;
++	spin_lock(&imgsensor_drv_lock);
++	if ((framerate == 300) && (imgsensor.autoflicker_en == KAL_TRUE))
++		imgsensor.current_fps = 296;
++	else if ((framerate == 150) && (imgsensor.autoflicker_en == KAL_TRUE))
++		imgsensor.current_fps = 146;
++	else
++		imgsensor.current_fps = framerate;
++	spin_unlock(&imgsensor_drv_lock);
++	set_max_framerate(imgsensor.current_fps,1);
+ 
+-	
++	return ERROR_NONE;
+ }
+ 
+-
+-
+-static void OV2710FullSizeCaptureSetting(void)
++static kal_uint32 set_auto_flicker_mode(kal_bool enable, UINT16 framerate)
+ {
+-	OV2710SENSORDB("[OV2710FullSizeCaptureSetting]\n");
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	//ov2710_1280_720();
+-	ov2710_1920_1080();
+-	
+-	spin_lock(&OV2710_drv_lock);
+-	OV2710Sensor.IsPVmode = KAL_FALSE;
+-	OV2710Sensor.CapturePclk = PLCK_CAP;
+-	spin_unlock(&OV2710_drv_lock);
++	LOG_INF("enable = %d, framerate = %d \n", enable, framerate);
++	spin_lock(&imgsensor_drv_lock);
++	if (enable) //enable auto flicker	  
++		imgsensor.autoflicker_en = KAL_TRUE;
++	else //Cancel Auto flick
++		imgsensor.autoflicker_en = KAL_FALSE;
++	spin_unlock(&imgsensor_drv_lock);
++	return ERROR_NONE;
+ }
+ 
+-
+-
+-static void OV2710SetHVMirror(kal_uint8 Mirror)
++static kal_uint32 set_max_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenario_id, MUINT32 framerate) 
+ {
++	kal_uint32 frame_length;
++  
++	LOG_INF("scenario_id = %d, framerate = %d\n", scenario_id, framerate);
+ 
++	switch (scenario_id) {
++		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
++			frame_length = imgsensor_info.pre.pclk / framerate * 10 / imgsensor_info.pre.linelength;
++			spin_lock(&imgsensor_drv_lock);
++			imgsensor.dummy_line = (frame_length > imgsensor_info.pre.framelength) ? (frame_length - imgsensor_info.pre.framelength) : 0;
++			imgsensor.frame_length = imgsensor_info.pre.framelength + imgsensor.dummy_line;
++			imgsensor.min_frame_length = imgsensor.frame_length;
++			spin_unlock(&imgsensor_drv_lock);
++			set_dummy();			
++			break;			
++		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
++			if(framerate == 0)
++				return ERROR_NONE;
++			frame_length = imgsensor_info.normal_video.pclk / framerate * 10 / imgsensor_info.normal_video.linelength;
++			spin_lock(&imgsensor_drv_lock);
++			imgsensor.dummy_line = (frame_length > imgsensor_info.normal_video.framelength) ? (frame_length - imgsensor_info.normal_video.framelength) : 0;			
++			imgsensor.frame_length = imgsensor_info.normal_video.framelength + imgsensor.dummy_line;
++			imgsensor.min_frame_length = imgsensor.frame_length;
++			spin_unlock(&imgsensor_drv_lock);
++			set_dummy();			
++			break;
++		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:		
++        	  if (imgsensor.current_fps == imgsensor_info.cap1.max_framerate) {
++                frame_length = imgsensor_info.cap1.pclk / framerate * 10 / imgsensor_info.cap1.linelength;
++                spin_lock(&imgsensor_drv_lock);
++		            imgsensor.dummy_line = (frame_length > imgsensor_info.cap1.framelength) ? (frame_length - imgsensor_info.cap1.framelength) : 0;
++		            imgsensor.frame_length = imgsensor_info.cap1.framelength + imgsensor.dummy_line;
++		            imgsensor.min_frame_length = imgsensor.frame_length;
++		            spin_unlock(&imgsensor_drv_lock);
++            } else {
++        		    if (imgsensor.current_fps != imgsensor_info.cap.max_framerate)
++                    LOG_INF("Warning: current_fps %d fps is not support, so use cap's setting: %d fps!\n",framerate,imgsensor_info.cap.max_framerate/10);
++			frame_length = imgsensor_info.cap.pclk / framerate * 10 / imgsensor_info.cap.linelength;
++			spin_lock(&imgsensor_drv_lock);
++			imgsensor.dummy_line = (frame_length > imgsensor_info.cap.framelength) ? (frame_length - imgsensor_info.cap.framelength) : 0;
++			imgsensor.frame_length = imgsensor_info.cap.framelength + imgsensor.dummy_line;
++			imgsensor.min_frame_length = imgsensor.frame_length;
++			spin_unlock(&imgsensor_drv_lock);
++            }
++			set_dummy();			
++			break;	
++		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
++			frame_length = imgsensor_info.hs_video.pclk / framerate * 10 / imgsensor_info.hs_video.linelength;
++			spin_lock(&imgsensor_drv_lock);
++			imgsensor.dummy_line = (frame_length > imgsensor_info.hs_video.framelength) ? (frame_length - imgsensor_info.hs_video.framelength) : 0;
++			imgsensor.frame_length = imgsensor_info.hs_video.framelength + imgsensor.dummy_line;
++			imgsensor.min_frame_length = imgsensor.frame_length;
++			spin_unlock(&imgsensor_drv_lock);
++			set_dummy();			
++			break;
++		case MSDK_SCENARIO_ID_SLIM_VIDEO:
++			frame_length = imgsensor_info.slim_video.pclk / framerate * 10 / imgsensor_info.slim_video.linelength;
++			spin_lock(&imgsensor_drv_lock);
++			imgsensor.dummy_line = (frame_length > imgsensor_info.slim_video.framelength) ? (frame_length - imgsensor_info.slim_video.framelength): 0;	
++			imgsensor.frame_length = imgsensor_info.slim_video.framelength + imgsensor.dummy_line;
++			imgsensor.min_frame_length = imgsensor.frame_length;
++			spin_unlock(&imgsensor_drv_lock);
++			set_dummy();	
++			break;		
++		default:  //coding with  preview scenario by default
++			frame_length = imgsensor_info.pre.pclk / framerate * 10 / imgsensor_info.pre.linelength;
++			spin_lock(&imgsensor_drv_lock);
++			imgsensor.dummy_line = (frame_length > imgsensor_info.pre.framelength) ? (frame_length - imgsensor_info.pre.framelength) : 0;
++			imgsensor.frame_length = imgsensor_info.pre.framelength + imgsensor.dummy_line;
++			imgsensor.min_frame_length = imgsensor.frame_length;
++			spin_unlock(&imgsensor_drv_lock);
++			set_dummy();	
++			LOG_INF("error scenario_id = %d, we use preview scenario \n", scenario_id);
++			break;
++	}	
++	return ERROR_NONE;
++}
+ 
+- 	kal_uint8 mirror = 0, flip = 0;
+-
+-	OV2710SENSORDB("[OV2710SetHVMirror]mirror=%d\n", Mirror);
+-		wmt_print("skip seting sensor register %s %d\n",__func__,__LINE__);
+-		return;
+-
+-  Mirror = IMAGE_HV_MIRROR;
+ 
+-  flip = OV2710_read_cmos_sensor(0x3820);
+-	mirror = OV2710_read_cmos_sensor(0x3821);
++static kal_uint32 get_default_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenario_id, MUINT32 *framerate) 
++{
++	LOG_INF("scenario_id = %d\n", scenario_id);
+ 
+-	switch (Mirror)
+-	{
+-	//for tablet PC sub only
+-		case IMAGE_NORMAL:
+-			OV2710_write_cmos_sensor(0x3820, flip | 0x06);     
+-			OV2710_write_cmos_sensor(0x3821, mirror | 0x06);
++	switch (scenario_id) {
++		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
++			*framerate = imgsensor_info.pre.max_framerate;
+ 			break;
+-		case IMAGE_H_MIRROR:
+-			OV2710_write_cmos_sensor(0x3820, flip | 0x06);     
+-			OV2710_write_cmos_sensor(0x3821, mirror & 0xf9);
+-			break;
+-		case IMAGE_V_MIRROR: 
+-			OV2710_write_cmos_sensor(0x3820, flip & 0xf9);     
+-			OV2710_write_cmos_sensor(0x3821, mirror | 0x06);
+-			break;
+-		case IMAGE_HV_MIRROR:
+-			OV2710_write_cmos_sensor(0x3820, flip & 0xf9);     
+-			OV2710_write_cmos_sensor(0x3821, mirror & 0xf9);
+-			break;
+-		default:
+-			break;
+-	}
+-}
+-
+-
+-
+-MUINT32 OV2710Open(void)
+-{
+-	volatile signed int i;
+-	kal_uint16 sensor_id = 0;
+-			wmt_print("ov2710raw_sensor %s %d\n",__func__,__LINE__);
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	OV2710SENSORDB("[OV2710Open]\n");
+-	
+-	OV2710_write_cmos_sensor(0x3008, 0x82);
+-    mDELAY(10);
+-
+-	for(i = 0; i < 3; i++)
+-	{
+-		sensor_id = (OV2710_read_cmos_sensor(0x300A) << 8) | OV2710_read_cmos_sensor(0x300B);
+-		
+-		OV2710SENSORDB("[OV2710Open]SensorId=%x\n", sensor_id);
+-
+-		if(sensor_id != OV2710_SENSOR_ID)
+-		{
+-			return ERROR_SENSOR_CONNECT_FAIL;
+-		}else
+-			break;
+-	}
+-
+-	open_mutex = OPEN_MUTEX_NULL;
+-	
+-	spin_lock(&OV2710_drv_lock);
+-	OV2710Sensor.CaptureDummyPixels = 0;
+-  	OV2710Sensor.CaptureDummyLines = 0;
+-	OV2710Sensor.PreviewDummyPixels = 0;
+-  	OV2710Sensor.PreviewDummyLines = 0;
+-	OV2710Sensor.SensorMode = SENSOR_MODE_INIT;
+-	OV2710Sensor.isoSpeed = 100;
+-	spin_unlock(&OV2710_drv_lock);
+-
+-	OV2710InitialSetting();
+-
+-	return ERROR_NONE;
+-}
+-
+-
+-
+-MUINT32 OV2710Close(void)
+-{
+-	OV2710SENSORDB("[OV2710Close]\n");
+-				wmt_print("ov2710raw_sensor %s %d\n",__func__,__LINE__);
+-
+-	return ERROR_NONE;
+-}
+-
+-
+-
+-MUINT32 OV2710Preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
+-					  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
+-{	
+-	OV2710SENSORDB("[OV2710Preview]enter\n");
+-	
+-	OV2710PreviewSetting();
+-	mDELAY(300);
+-	//OV2710_set_AE_mode(KAL_TRUE);
+-	//OV2710_set_AWB_mode(KAL_TRUE);
+-
+-	//kevin add
+-	//OV2710_set_param_wb(AWB_MODE_FLUORESCENT);
+-
+-	
+-	//OV2710SetHVMirror(sensor_config_data->SensorImageMirror);
+-	
+-	OV2710SENSORDB("[OV2710Preview]exit\n");
+-	wmt_print("TRUE %d\n",TRUE);
+-	
+-  	return TRUE ;
+-}	
+-
+-
+-
+-MUINT32 OV2710Capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
+-					  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
+-{
+-	kal_uint32 shutter = 0, temp = 0;
+-
+-	OV2710SENSORDB("[OV2710Capture]enter\n");
+-		wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	if(SENSOR_MODE_PREVIEW == OV2710Sensor.SensorMode)
+-	{
+-		OV2710SENSORDB("[OV2710Capture]Normal Capture\n ");
+-
+-		OV2710_set_AWB_mode(KAL_FALSE);
+-
+-        OV2710_write_cmos_sensor(0x3a00, OV2710_read_cmos_sensor(0x3a00)&0xfb); 
+-        OV2710_write_cmos_sensor(0x3503, OV2710_read_cmos_sensor(0x3503)|0x07); 		
+-		
+-		shutter=OV2710ReadShutter();
+-		temp =OV2710ReadSensorGain();	
+-		
+-		mDELAY(30);
+-		OV2710FullSizeCaptureSetting();
+-
+-
+-		OV2710_set_param_wb(AWB_MODE_FLUORESCENT);
+-
+-		
+-		OV2710SetHVMirror(sensor_config_data->SensorImageMirror);//tablet  pc sub sensor use only
+-		spin_lock(&OV2710_drv_lock);
+-		OV2710Sensor.SensorMode= SENSOR_MODE_CAPTURE;
+-		OV2710Sensor.CaptureDummyPixels = 0;
+-  		OV2710Sensor.CaptureDummyLines = 0;
+-		spin_unlock(&OV2710_drv_lock);
+-		
+-		shutter = shutter * 2;
+-	
+-  		OV2710WriteShutter(shutter);
+-  		mDELAY(300);
+-
+-		spin_lock(&OV2710_drv_lock);
+-  		OV2710Sensor.SensorGain = temp;
+-		OV2710Sensor.SensorShutter = shutter;
+-		spin_unlock(&OV2710_drv_lock);
+-	}
+-	else if(SENSOR_MODE_ZSD == OV2710Sensor.SensorMode)
+-	{
+-		//for zsd hdr use
+-		shutter = OV2710ReadShutter();
+-		temp = OV2710ReadSensorGain();
+-		
+-		spin_lock(&OV2710_drv_lock);
+-  		OV2710Sensor.SensorGain = temp;
+-		OV2710Sensor.SensorShutter = shutter;
+-		spin_unlock(&OV2710_drv_lock);
+-	}
+-	
+-	OV2710SENSORDB("[OV2710Capture]exit\n");
+-	
+-	return ERROR_NONE; 
+-}
+-
+-
+-
+-MUINT32 OV2710ZSDPreview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
+-					  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
+-{
+-	OV2710SENSORDB("[OV2710ZSDPreview]enter\n");
+-	
+-	if(SENSOR_MODE_PREVIEW == OV2710Sensor.SensorMode || OV2710Sensor.SensorMode == SENSOR_MODE_INIT)
+-	{
+-		OV2710FullSizeCaptureSetting();
+-		OV2710SetHVMirror(sensor_config_data->SensorImageMirror);//tablet PC sub sensor use
+-	}
+-
+-	spin_lock(&OV2710_drv_lock);
+-	OV2710Sensor.SensorMode = SENSOR_MODE_ZSD;
+-	spin_unlock(&OV2710_drv_lock);
+-	
+-	OV2710_set_AE_mode(KAL_TRUE);
+-	OV2710_set_AWB_mode(KAL_TRUE);
+-	
+-	OV2710SENSORDB("[OV2710ZSDPreview]exit\n");
+-	
+-	return ERROR_NONE; 
+-}
+-
+-
+-
+-MUINT32 OV2710GetResolution(MSDK_SENSOR_RESOLUTION_INFO_STRUCT *pSensorResolution)
+-{
+-	OV2710SENSORDB("[OV2710GetResolution]\n");
+-			wmt_print("ov2710raw_sensor %s %d\n",__func__,__LINE__);
+-
+-	pSensorResolution->SensorPreviewWidth = OV2710_IMAGE_SENSOR_SVGA_WIDTH - 1 * 8;
+-	pSensorResolution->SensorPreviewHeight = OV2710_IMAGE_SENSOR_SVGA_HEIGHT - 1 * 8;
+-	pSensorResolution->SensorFullWidth = OV2710_IMAGE_SENSOR_UVGA_WITDH - 2 * 8;  
+-	pSensorResolution->SensorFullHeight = OV2710_IMAGE_SENSOR_UVGA_HEIGHT - 2 * 8;
+-	pSensorResolution->SensorVideoWidth = OV2710_IMAGE_SENSOR_SVGA_WIDTH - 1 * 8;
+-	pSensorResolution->SensorVideoHeight = OV2710_IMAGE_SENSOR_SVGA_HEIGHT - 1 * 8;
+-	
+-	return ERROR_NONE;
+-}
+-
+-
+-
+-MUINT32 OV2710GetInfo(MSDK_SCENARIO_ID_ENUM ScenarioId,
+-					  MSDK_SENSOR_INFO_STRUCT *pSensorInfo,
+-					  MSDK_SENSOR_CONFIG_STRUCT *pSensorConfigData)
+-{
+-	OV2710SENSORDB("[OV2710GetInfo]\n");
+-			wmt_print("ov2710raw_sensor %s %d   ScenarioId %d\n",__func__,__LINE__,ScenarioId);
+-
+-
+-	pSensorInfo->SensorPreviewResolutionX = OV2710_IMAGE_SENSOR_SVGA_WIDTH - 1 * 8;
+-	pSensorInfo->SensorPreviewResolutionY = OV2710_IMAGE_SENSOR_SVGA_HEIGHT - 1 * 8;
+-	pSensorInfo->SensorFullResolutionX = OV2710_IMAGE_SENSOR_UVGA_WITDH - 2 * 8;
+-	pSensorInfo->SensorFullResolutionY = OV2710_IMAGE_SENSOR_UVGA_HEIGHT - 2 * 8;
+-	pSensorInfo->SensorCameraPreviewFrameRate = 30;
+-	pSensorInfo->SensorVideoFrameRate = 30;
+-	pSensorInfo->SensorStillCaptureFrameRate = 10;
+-	pSensorInfo->SensorWebCamCaptureFrameRate = 15;
+-	pSensorInfo->SensorResetActiveHigh = FALSE;
+-	pSensorInfo->SensorResetDelayCount = 1;
+-	pSensorInfo->SensorOutputDataFormat = SENSOR_OUTPUT_FORMAT_RAW_B;
+-	pSensorInfo->SensorClockPolarity = SENSOR_CLOCK_POLARITY_HIGH;	
+-	pSensorInfo->SensorClockFallingPolarity = SENSOR_CLOCK_POLARITY_LOW;
+-	pSensorInfo->SensorHsyncPolarity = SENSOR_CLOCK_POLARITY_LOW;
+-	pSensorInfo->SensorVsyncPolarity = SENSOR_CLOCK_POLARITY_LOW;
+-	pSensorInfo->SensorInterruptDelayLines = 1;
+-	//pSensorInfo->SensroInterfaceType = SENSOR_INTERFACE_TYPE_PARALLEL;
+-	pSensorInfo->SensroInterfaceType = SENSOR_INTERFACE_TYPE_MIPI;
+-	pSensorInfo->CaptureDelayFrame = 2;
+-	pSensorInfo->PreviewDelayFrame = 4; 
+-	pSensorInfo->VideoDelayFrame = 4; 		
+-	pSensorInfo->SensorMasterClockSwitch = 0; 
+-    pSensorInfo->SensorDrivingCurrent = ISP_DRIVING_6MA;    		
+-
+-
+-	switch (ScenarioId)
+-	{
+-		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
+ 		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
+-			pSensorInfo->SensorClockFreq = 20;
+-			pSensorInfo->SensorClockDividCount = 3;
+-			pSensorInfo->SensorClockRisingCount = 0;
+-			pSensorInfo->SensorClockFallingCount = 2;
+-			pSensorInfo->SensorPixelClockCount = 3;
+-			pSensorInfo->SensorDataLatchCount = 2;
+-            pSensorInfo->SensorGrabStartX = 2; 
+-            pSensorInfo->SensorGrabStartY = 2;         
+-
+-            #if 1
+-                pSensorInfo->SensorMIPILaneNumber = SENSOR_MIPI_1_LANE;
+-                pSensorInfo->MIPIDataLowPwr2HighSpeedTermDelayCount = 0;
+-                pSensorInfo->MIPIDataLowPwr2HighSpeedSettleDelayCount = 1;
+-                pSensorInfo->MIPICLKLowPwr2HighSpeedTermDelayCount = 0;
+-                pSensorInfo->SensorWidthSampling = 0;  // 0 is default 1x
+-                pSensorInfo->SensorHightSampling = 0;   // 0 is default 1x
+-                pSensorInfo->SensorPacketECCOrder = 1;
+-            #endif
+-			
++			*framerate = imgsensor_info.normal_video.max_framerate;
+ 			break;
+ 		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
+-			pSensorInfo->SensorClockFreq = 20;
+-			pSensorInfo->SensorClockDividCount = 3;
+-			pSensorInfo->SensorClockRisingCount = 0;
+-			pSensorInfo->SensorClockFallingCount = 2;
+-			pSensorInfo->SensorPixelClockCount = 3;
+-			pSensorInfo->SensorDataLatchCount = 2;
+-            pSensorInfo->SensorGrabStartX = 2; 
+-            pSensorInfo->SensorGrabStartY = 2;             
+-			break;
+-		default:
+-			pSensorInfo->SensorClockFreq = 20;
+-			pSensorInfo->SensorClockDividCount = 3;
+-			pSensorInfo->SensorClockRisingCount = 0;
+-			pSensorInfo->SensorClockFallingCount = 2;
+-			pSensorInfo->SensorPixelClockCount = 3;
+-			pSensorInfo->SensorDataLatchCount = 2;
+-            pSensorInfo->SensorGrabStartX = 2; 
+-            pSensorInfo->SensorGrabStartY = 2;             
+-			break;
+-	}
+-
+-	memcpy(pSensorConfigData, &OV2710SensorConfigData, sizeof(MSDK_SENSOR_CONFIG_STRUCT));
+-	
+-	return ERROR_NONE;
+-}
+-
+-
+-
+-MUINT32 OV2710Control(MSDK_SCENARIO_ID_ENUM ScenarioId, MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *pImageWindow,
+-					  MSDK_SENSOR_CONFIG_STRUCT *pSensorConfigData)
+-{
+-	OV2710SENSORDB("[OV2710Control]\n");
+-					wmt_print("ov2710raw_sensor %s %d %d\n",__func__,__LINE__,ScenarioId);
+-	switch (ScenarioId)
+-	{
+-		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
+-		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
+-			if(enable_open_mutex!=0&&open_mutex&OPEN_MUTEX_PREVIEW!=0){
+-				wmt_print("\n\n\n\n\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx detect %s %d\n\n\n\n\n\n",__func__,__LINE__);
+-				break;
+-			}
+-			open_mutex |= OPEN_MUTEX_PREVIEW;
+-			OV2710Preview(pImageWindow, pSensorConfigData);
+-			break;
+-		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:			
+-			if(enable_open_mutex!=0&&open_mutex&OPEN_MUTEX_CAP!=0){
+-				wmt_print("\n\n\n\n\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx detect %s %d\n\n\n\n\n\n",__func__,__LINE__);
+-				break;			
+-			}
+-			open_mutex|=OPEN_MUTEX_CAP;
+-			OV2710Capture(pImageWindow, pSensorConfigData);
+-			break;
+-		case MSDK_SCENARIO_ID_CAMERA_ZSD:	
+-			if(enable_open_mutex!=0&&open_mutex&OPEN_MUTEX_PREVIEW!=0){
+-				wmt_print("\n\n\n\n\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx detect %s %d\n\n\n\n\n\n",__func__,__LINE__);
+-				break;
+-			}
+-			open_mutex |= OPEN_MUTEX_PREVIEW;			
+-			OV2710ZSDPreview(pImageWindow, pSensorConfigData);
+-			break;
+-		default:
+-		    break; 
+-	}
+-	
+-	return TRUE;
+-}
+-
+-
+-
+-BOOL OV2710_set_param_effect(UINT16 para)
+-{
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	OV2710SENSORDB("[OV2710_set_param_effect]para=%d\n", para);
+-    switch (para)
+-    {
+-        case MEFFECT_OFF:
+-          	OV2710_write_cmos_sensor(0x3212, 0x00);           
+-            OV2710_write_cmos_sensor(0x5001, 0x1f); 
+-            OV2710_write_cmos_sensor(0x507B, 0x06); 
+-           	OV2710_write_cmos_sensor(0x507e, 0x3a); 
+-            OV2710_write_cmos_sensor(0x507f, 0x10);           
+-           	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-            OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			break;
+-        case MEFFECT_SEPIA:
+-            OV2710_write_cmos_sensor(0x3212, 0x00);           
+-           	OV2710_write_cmos_sensor(0x5001, 0x1f); 
+-           	OV2710_write_cmos_sensor(0x507B, 0x1e); 
+-          	OV2710_write_cmos_sensor(0x507e, 0x40); 
+-           	OV2710_write_cmos_sensor(0x507f, 0xa0);           
+-         	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-           	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			break;
+-        case MEFFECT_NEGATIVE:
+-          	OV2710_write_cmos_sensor(0x3212, 0x00);           
+-            OV2710_write_cmos_sensor(0x5001, 0x1f); 
+-           	OV2710_write_cmos_sensor(0x507B, 0x46);           
+-            OV2710_write_cmos_sensor(0x3212, 0x10); 
+-          	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			break;
+-        case MEFFECT_SEPIAGREEN:
+-           	OV2710_write_cmos_sensor(0x3212, 0x00);          
+-           	OV2710_write_cmos_sensor(0x5001, 0x1f); 
+-          	OV2710_write_cmos_sensor(0x507B, 0x1e); 
+-           	OV2710_write_cmos_sensor(0x507e, 0x60); 
+-           	OV2710_write_cmos_sensor(0x507f, 0x60);           
+-           	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-           	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-            break;
+-        case MEFFECT_SEPIABLUE:
+-        	OV2710_write_cmos_sensor(0x3212, 0x00);           
+-           	OV2710_write_cmos_sensor(0x5001, 0x1f); 
+-           	OV2710_write_cmos_sensor(0x507B, 0x1e); 
+-           	OV2710_write_cmos_sensor(0x507e, 0xa0); 
+-         	OV2710_write_cmos_sensor(0x507f, 0x40);           
+-         	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-           	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-            break;
+-		case MEFFECT_MONO:
+-          	OV2710_write_cmos_sensor(0x3212, 0x00); 
+-            OV2710_write_cmos_sensor(0x5001, 0x1f); 
+-           	OV2710_write_cmos_sensor(0x507B, 0x26); 
+-          	OV2710_write_cmos_sensor(0x3212, 0x10); 
+-         	OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-			break;
+-        default:
+-            return KAL_FALSE;
+-    }
+-
+-    return KAL_TRUE;
+-} 
+-
+-
+-
+-BOOL OV2710_set_param_banding(UINT16 para)
+-{
+-    kal_uint8 banding;
+-  	kal_uint32 exposure_limitation = 0, line_length = 0, sensor_pixel_clock = 0;
+-
+-	OV2710SENSORDB("[OV2710_set_param_banding]para=%d\n", para);	
+-  	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	if (OV2710Sensor.IsPVmode == KAL_TRUE)
+-	{
+-		line_length = OV2710_PV_PERIOD_PIXEL_NUMS + OV2710Sensor.PreviewDummyPixels;
+-		exposure_limitation = OV2710_PV_PERIOD_LINE_NUMS + OV2710Sensor.PreviewDummyLines;
+-		sensor_pixel_clock = OV2710Sensor.PreviewPclk * 100 * 1000;
+-	}
+-	else
+-	{
+-		line_length = OV2710_FULL_PERIOD_PIXEL_NUMS + OV2710Sensor.CaptureDummyPixels;
+-		exposure_limitation = OV2710_FULL_PERIOD_LINE_NUMS + OV2710Sensor.CaptureDummyLines;
+-		sensor_pixel_clock = OV2710Sensor.CapturePclk * 100 * 1000;
+-	}
+-
+-	line_length = line_length * 2;
+-    banding = OV2710_read_cmos_sensor(0x3A05);
+-	
+-    switch (para)
+-    {
+-        case AE_FLICKER_MODE_50HZ:
+-			OV2710_write_cmos_sensor(0x3a05, banding & 0x7f);
+-			break;
+-        case AE_FLICKER_MODE_60HZ:			
+-			OV2710_write_cmos_sensor(0x3a05, banding | 0x80);
+-			break;
+-        default:
+-			return FALSE;
+-    }
+-
+-    return TRUE;
+-}
+-
+-
+-
+-BOOL OV2710_set_param_exposure(UINT16 para)
+-{
+-    kal_uint8 EvTemp0 = 0x00, EvTemp1 = 0x00, temp_reg= 0x00;
+-
+-	OV2710SENSORDB("[OV2710_set_param_exposure]para=%d\n", para);
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	if (SCENE_MODE_HDR == OV2710Sensor.sceneMode)
+-   {
+-       OV2710_set_param_exposure_for_HDR(para);
+-	   
+-       return TRUE;
+-   }
+-	
+-	temp_reg=OV2710_read_cmos_sensor(0x5083);
+-	OV2710_write_cmos_sensor(0x507b, OV2710_read_cmos_sensor(0x507b) | 0x04);
+-
+-    switch (para)
+-    {	
+-    	case AE_EV_COMP_20:
+-			EvTemp0 = 0x20;
+-			EvTemp1 = temp_reg & 0xf7;
+-			break;
+-		case AE_EV_COMP_10:
+-			EvTemp0 = 0x10;
+-			EvTemp1 = temp_reg & 0xf7;
+-			break;
+-		case AE_EV_COMP_00:
+-			EvTemp0 = 0x00;
+-			EvTemp1 = temp_reg & 0xf7;
+-			break;
+-		case AE_EV_COMP_n10:
+-			EvTemp0 = 0x10;
+-			EvTemp1 = temp_reg | 0x08;	
+-			break;
+-        case AE_EV_COMP_n20:
+-			EvTemp0 = 0x20;
+-			EvTemp1 = temp_reg | 0x08;	
++			*framerate = imgsensor_info.cap.max_framerate;
+ 			break;		
+-        default:
+-            return FALSE;
+-    }
+-	
+-    OV2710_write_cmos_sensor(0x3212, 0x00); 
+-	OV2710_write_cmos_sensor(0x5082, EvTemp0);
+-	OV2710_write_cmos_sensor(0x5083, EvTemp1);	
+-    OV2710_write_cmos_sensor(0x3212, 0x10); 
+-    OV2710_write_cmos_sensor(0x3212, 0xa0); 
+-	
+-    return TRUE;
+-}
+-
+-
+-
+-MUINT32 OV2710RAWSensorSetting(FEATURE_ID iCmd, MUINT32 iPara)
+-{
+-	OV2710SENSORDB("[OV2710RAWSensorSetting]icmd=%d, ipara=%d\n", iCmd, iPara);
+-
+-	switch (iCmd) {
+-		case FID_SCENE_MODE:
+-			OV2710_set_scene_mode(iPara); 
+-	    	break; 	    
+-		case FID_AWB_MODE: 	    
+-        	OV2710_set_param_wb(iPara);
++		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
++			*framerate = imgsensor_info.hs_video.max_framerate;
+ 			break;
+-		case FID_COLOR_EFFECT:	    	    
+-         	OV2710_set_param_effect(iPara);
+-		 	break;
+-		case FID_AE_EV:    	    
+-         	OV2710_set_param_exposure(iPara);
+-		 	break;
+-		case FID_AE_FLICKER:    	    	    
+-         	OV2710_set_param_banding(iPara);
+-		 	break;
+-    	case FID_AE_SCENE_MODE: 
+-         	if(iPara == AE_MODE_OFF) 
+-				OV2710_set_AE_mode(KAL_FALSE);
+-         	else 
+-	         	OV2710_set_AE_mode(KAL_TRUE);
+-         	break; 
+-   	 	case FID_ZOOM_FACTOR:	    
+-         	break; 
+-		case FID_ISP_CONTRAST:
+-            OV2710_set_contrast(iPara);
+-            break;
+-        case FID_ISP_BRIGHT:
+-            OV2710_set_brightness(iPara);
+-            break;
+-        case FID_ISP_SAT:
+-            OV2710_set_saturation(iPara);
+-            break;
+-		case FID_AE_ISO:
+-            OV2710_set_iso(iPara);
+-            break;
+-		default:
+-		 	break;
+-	} 
+-	mDELAY(30);
+-	return TRUE;
+-}
+-
+-
+-
+-
+-
+-
+-
+-
+-MUINT32 OV2710RAWSetVideoMode(UINT16 u2FrameRate)
+-{
+-	wmt_print("seting sensor register %s %d u2FrameRate %d\n",__func__,__LINE__,u2FrameRate);
+-
+-	if (u2FrameRate == 30)
+-	{
+-    	//30fps 26mclk 
+-
+-	}
+-    else if (u2FrameRate == 15)   
+-	{
+-    	//15fps 26mclk 
+-
+-	}
+-    else 
+-    {
+-        wmt_print("Wrong frame rate setting \n");
+-    }   
+-	ov2710_1920_1080();
+-	OV2710_set_param_wb(AWB_MODE_FLUORESCENT);
+-	
+-	
+-	mDELAY(30);
+-
+-    return TRUE;
+-}
+-
+-
+-
+-MUINT32 OV2710SetMaxFramerateByScenario(MSDK_SCENARIO_ID_ENUM scenarioId, MUINT32 frameRate) 
+-{
+-	kal_uint32 pclk;
+-	kal_int16 dummyLine, lineLength, frameHeight;
+-		#if 0
+-	switch (scenarioId) 
+-	{
+-		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
+-			pclk = 480 / 10;
+-			lineLength = OV2710_PV_PERIOD_PIXEL_NUMS;
+-			frameHeight = (10 * pclk) / frameRate / lineLength;
+-			dummyLine = frameHeight - OV2710_PV_PERIOD_LINE_NUMS;
+-			OV2710SENSORDB("[OV2710SetMaxFramerateByScenario][preview]framerate=%d, dummy_line=%d\n",frameRate, dummyLine);
+-			OV2710SetDummy(0, dummyLine);			
+-			break;			
+-		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
+-			pclk = 480 / 10;
+-			lineLength = OV2710_PV_PERIOD_PIXEL_NUMS;
+-			frameHeight = (10 * pclk) / frameRate / lineLength;
+-			dummyLine = frameHeight - OV2710_PV_PERIOD_LINE_NUMS;
+-			OV2710SENSORDB("[OV2710SetMaxFramerateByScenario][video]framerate=%d, dummy_line=%d\n",frameRate, dummyLine);
+-			OV2710SetDummy(0, dummyLine);			
+-			break;			
+-		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
+-		case MSDK_SCENARIO_ID_CAMERA_ZSD:			
+-			pclk = 480 / 10;
+-			lineLength = OV2710_FULL_PERIOD_PIXEL_NUMS;
+-			frameHeight = (10 * pclk) / frameRate / lineLength;
+-			dummyLine = frameHeight - OV2710_FULL_PERIOD_LINE_NUMS;
+-			OV2710SENSORDB("[OV2710SetMaxFramerateByScenario][capture/zsd]framerate=%d, dummy_line=%d\n",frameRate, dummyLine);
+-			OV2710SetDummy(0, dummyLine);			
+-			break;		
+-        case MSDK_SCENARIO_ID_CAMERA_3D_PREVIEW: 
+-        case MSDK_SCENARIO_ID_CAMERA_3D_VIDEO:
+-        case MSDK_SCENARIO_ID_CAMERA_3D_CAPTURE:  
+-			break;		
+-		default:
++		case MSDK_SCENARIO_ID_SLIM_VIDEO: 
++			*framerate = imgsensor_info.slim_video.max_framerate;
+ 			break;
+-	}	
+-	#endif 
+-	return ERROR_NONE;
+-}
+-
+-
+-
+-UINT32 OV2710GetDefaultFramerateByScenario(MSDK_SCENARIO_ID_ENUM scenarioId, MUINT32 *pframeRate) 
+-{
+-	OV2710SENSORDB("[OV2710GetDefaultFramerateByScenario]\n");
+-	
+-	switch (scenarioId) 
+-	{
+-		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
+-		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
+-			 *pframeRate = 300;
+-			 break;
+-		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
+-		case MSDK_SCENARIO_ID_CAMERA_ZSD:
+-			 *pframeRate = 300;
+-			break;		
+-        case MSDK_SCENARIO_ID_CAMERA_3D_PREVIEW: 
+-        case MSDK_SCENARIO_ID_CAMERA_3D_VIDEO:
+-        case MSDK_SCENARIO_ID_CAMERA_3D_CAPTURE: 
+-			*pframeRate = 300;
+-			break;		
+ 		default:
+ 			break;
+ 	}
+@@ -1768,365 +1195,158 @@ UINT32 OV2710GetDefaultFramerateByScenario(MSDK_SCENARIO_ID_ENUM scenarioId, MUI
+ 	return ERROR_NONE;
+ }
+ 
+-
+-
+-UINT32 OV2710SetTestPatternMode(kal_bool bEnable)
+-{	
+-	OV2710SENSORDB("[OV2710SetTestPatternMode]bEnable=%d\n",bEnable);	
+-	wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	if(bEnable)	
+-		OV2710_write_cmos_sensor(0x50a0, 0x80);		
+-	else	
+-		OV2710_write_cmos_sensor(0x50a0, 0x00);		
+-	mDELAY(100);
+-	 
+-	return ERROR_NONE;
+-}
+-
+-
+-
+-void OV2710Set3ACtrl(ACDK_SENSOR_3A_LOCK_ENUM action)
+-{
+-	OV2710SENSORDB("[OV2710Set3ACtrl]action=%d\n",action);	
+-
+-   switch (action)
+-   {
+-      case SENSOR_3A_AE_LOCK:
+-          	OV2710_set_AE_mode(KAL_FALSE);
+-      		break;
+-      case SENSOR_3A_AE_UNLOCK:
+-          	OV2710_set_AE_mode(KAL_TRUE);
+-      		break;
+-      case SENSOR_3A_AWB_LOCK:
+-          	OV2710_set_AWB_mode(KAL_FALSE);
+-      		break;
+-      case SENSOR_3A_AWB_UNLOCK:
+-          	OV2710_set_AWB_mode(KAL_TRUE);
+-      		break;
+-      default:
+-      		break;
+-   }
+-
+-   //fix wb mode for capture -> preview,root casue is ap follow .
+-   OV2710_set_param_wb(WBcount);
+-   return;
+-}
+-
+-
+-
+-static void OV2710GetCurAeAwbInfo(uintptr_t pSensorAEAWBCurStruct)
+-{
+-	//OV2710SENSORDB("[OV2710GetCurAeAwbInfo]\n");	
+-
+-		wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-	
+-	PSENSOR_AE_AWB_CUR_STRUCT Info = (PSENSOR_AE_AWB_CUR_STRUCT)pSensorAEAWBCurStruct;
+-	Info->SensorAECur.AeCurShutter = OV2710ReadShutter();
+-	Info->SensorAECur.AeCurGain = OV2710ReadSensorGain() * 2;
+-	Info->SensorAwbGainCur.AwbCurRgain = OV2710_read_cmos_sensor(0x504c);
+-	Info->SensorAwbGainCur.AwbCurBgain = OV2710_read_cmos_sensor(0x504e);
+-}
+-
+-
+-
+-void OV2710_get_AEAWB_lock(MUINT32 *pAElockRet32, MUINT32 *pAWBlockRet32)
+-{
+-	OV2710SENSORDB("[OV2710_get_AEAWB_lock]\n");	
+-	
+-	*pAElockRet32 = 1;
+-	*pAWBlockRet32 = 1;
+-}
+-
+-
+-
+-void OV2710_GetDelayInfo(uintptr_t delayAddr)
+-{
+-	//OV2710SENSORDB("[OV2710_GetDelayInfo]\n");	
+-	
+-    SENSOR_DELAY_INFO_STRUCT* pDelayInfo = (SENSOR_DELAY_INFO_STRUCT*)delayAddr;
+-	pDelayInfo->InitDelay = 0;
+-	pDelayInfo->EffectDelay = 0;
+-	pDelayInfo->AwbDelay = 0;
+-	pDelayInfo->AFSwitchDelayFrame = 50;
+-}
+-
+-
+-
+-void OV2710GetExifInfo(uintptr_t exifAddr)
++static kal_uint32 set_test_pattern_mode(kal_bool enable)
+ {
+-	//OV2710SENSORDB("[OV2710GetExifInfo]\n");
+-    SENSOR_EXIF_INFO_STRUCT* pExifInfo = (SENSOR_EXIF_INFO_STRUCT*)exifAddr;
+-
+-    pExifInfo->FNumber = 28;
+-    pExifInfo->AEISOSpeed = OV2710Sensor.isoSpeed;
+-    pExifInfo->FlashLightTimeus = 0;
+-    pExifInfo->RealISOValue = OV2710Sensor.isoSpeed;
+-	pExifInfo->AWBMode = WBcount;
++	LOG_INF("enable: %d\n", enable);
++
++	if (enable) {
++		// 0x503d[7]: 1 enable,  0 disable
++		// 0x503d[5:4]; 00 Color bar, 01 Random Data, 10 Square, 11 BLACK
++		write_cmos_sensor(0x503d, 0x80);
++	} else {
++		// 0x503d[7]: 1 enable,  0 disable
++		// 0x503d[5:4]; 00 Color bar, 01 Random Data, 10 Square, 11 BLACK
++		write_cmos_sensor(0x503d, 0x00);
++	}	 
++	spin_lock(&imgsensor_drv_lock);
++	imgsensor.test_pattern = enable;
++	spin_unlock(&imgsensor_drv_lock);
++	return ERROR_NONE;
+ }
+ 
+-
+-MUINT32 OV2710FeatureControl(MSDK_SENSOR_FEATURE_ENUM FeatureId,
+-							 UINT8 *pFeaturePara,UINT32 *pFeatureParaLen)
++static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
++							 UINT8 *feature_para,UINT32 *feature_para_len)
+ {
+-
+-    UINT16 u2Temp = 0;
+-    UINT16 *pFeatureReturnPara16=(UINT16 *) pFeaturePara;
+-    UINT16 *pFeatureData16=(UINT16 *) pFeaturePara;
+-    UINT32 *pFeatureReturnPara32=(UINT32 *) pFeaturePara;
+-    UINT32 *pFeatureData32=(UINT32 *) pFeaturePara;
+-    unsigned long long *pFeatureData=(unsigned long long *) pFeaturePara;
+-    unsigned long long *pFeatureReturnPara=(unsigned long long *) pFeaturePara;
+-    PNVRAM_SENSOR_DATA_STRUCT pSensorDefaultData=(PNVRAM_SENSOR_DATA_STRUCT) pFeaturePara;
+-    MSDK_SENSOR_CONFIG_STRUCT *pSensorConfigData=(MSDK_SENSOR_CONFIG_STRUCT *) pFeaturePara;
+-    MSDK_SENSOR_REG_INFO_STRUCT *pSensorRegData=(MSDK_SENSOR_REG_INFO_STRUCT *) pFeaturePara;
+-    MSDK_SENSOR_GROUP_INFO_STRUCT *pSensorGroupInfo=(MSDK_SENSOR_GROUP_INFO_STRUCT *) pFeaturePara;
+-    MSDK_SENSOR_ITEM_INFO_STRUCT *pSensorItemInfo=(MSDK_SENSOR_ITEM_INFO_STRUCT *) pFeaturePara;
+-    MSDK_SENSOR_ENG_INFO_STRUCT *pSensorEngInfo=(MSDK_SENSOR_ENG_INFO_STRUCT *) pFeaturePara;
+-#if 0
+-
+-
+-
+-	UINT16 *pFeatureReturnPara16=(UINT16 *) pFeaturePara, *pFeatureData16=(UINT16 *) pFeaturePara;
+-	MUINT32 *pFeatureReturnPara32=(MUINT32 *) pFeaturePara, *pFeatureData32=(MUINT32 *) pFeaturePara;
+-	
+-    unsigned long long *pFeatureData=(unsigned long long *) pFeaturePara;
+-	MSDK_SENSOR_CONFIG_STRUCT *pSensorConfigData=(MSDK_SENSOR_CONFIG_STRUCT *) pFeaturePara;
+-	MSDK_SENSOR_REG_INFO_STRUCT *pSensorRegData=(MSDK_SENSOR_REG_INFO_STRUCT *) pFeaturePara;
+-#endif 
+-
+-	if(FeatureId!=3004 &&FeatureId!=3006)
+-			wmt_print("ov2710raw_sensor %s %d  %d\n",__func__,__LINE__,FeatureId);
+-
+-	switch (FeatureId)
+-	{
+-
+-		case SENSOR_FEATURE_GET_RESOLUTION:
+-			*pFeatureReturnPara16++=OV2710_IMAGE_SENSOR_UVGA_WITDH;
+-			*pFeatureReturnPara16=OV2710_IMAGE_SENSOR_UVGA_HEIGHT;
+-			*pFeatureParaLen=4;
+-			break;
++	UINT16 *feature_return_para_16=(UINT16 *) feature_para;
++	UINT16 *feature_data_16=(UINT16 *) feature_para;
++	UINT32 *feature_return_para_32=(UINT32 *) feature_para;
++	UINT32 *feature_data_32=(UINT32 *) feature_para;
++	unsigned long long *feature_data=(unsigned long long *) feature_para;
++    unsigned long long *feature_return_para=(unsigned long long *) feature_para;
++
++	SENSOR_WINSIZE_INFO_STRUCT *wininfo;	
++	MSDK_SENSOR_REG_INFO_STRUCT *sensor_reg_data=(MSDK_SENSOR_REG_INFO_STRUCT *) feature_para;
++ 
++	LOG_INF("feature_id = %d\n", feature_id);
++	switch (feature_id) {
+ 		case SENSOR_FEATURE_GET_PERIOD:
+-			*pFeatureReturnPara16++=OV2710_PV_PERIOD_PIXEL_NUMS + OV2710Sensor.PreviewDummyPixels;
+-			*pFeatureReturnPara16=OV2710_PV_PERIOD_LINE_NUMS + OV2710Sensor.PreviewDummyLines;
+-			*pFeatureParaLen=4;
++			*feature_return_para_16++ = imgsensor.line_length;
++			*feature_return_para_16 = imgsensor.frame_length;
++			*feature_para_len=4;
+ 			break;
+-		case SENSOR_FEATURE_GET_PIXEL_CLOCK_FREQ:
+-			*pFeatureReturnPara32 = OV2710Sensor.PreviewPclk * 1000 * 100;
+-			*pFeatureParaLen=4;
++		case SENSOR_FEATURE_GET_PIXEL_CLOCK_FREQ:	 
++			*feature_return_para_32 = imgsensor.pclk;
++			*feature_para_len=4;
++			break;		   
++		case SENSOR_FEATURE_SET_ESHUTTER:
++			set_shutter(*feature_data);
+ 			break;
+ 		case SENSOR_FEATURE_SET_NIGHTMODE:
+-			OV2710_night_mode((BOOL) *pFeatureData16);
++			night_mode((BOOL) *feature_data);
++			break;
++		case SENSOR_FEATURE_SET_GAIN:		
++			set_gain((UINT16) *feature_data);
++			break;  
++		case SENSOR_FEATURE_SET_FLASHLIGHT:
++			break;
++		case SENSOR_FEATURE_SET_ISP_MASTER_CLOCK_FREQ:
+ 			break;
+ 		case SENSOR_FEATURE_SET_REGISTER:
+-				wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-			OV2710_write_cmos_sensor(pSensorRegData->RegAddr, pSensorRegData->RegData);
++			write_cmos_sensor(sensor_reg_data->RegAddr, sensor_reg_data->RegData);
+ 			break;
+ 		case SENSOR_FEATURE_GET_REGISTER:
+-					wmt_print("seting sensor register %s %d\n",__func__,__LINE__);
+-
+-			pSensorRegData->RegData = OV2710_read_cmos_sensor(pSensorRegData->RegAddr);
+-			break;
+-		case SENSOR_FEATURE_GET_CONFIG_PARA:
+-			memcpy(pSensorConfigData, &OV2710SensorConfigData, sizeof(MSDK_SENSOR_CONFIG_STRUCT));
+-			*pFeatureParaLen=sizeof(MSDK_SENSOR_CONFIG_STRUCT);
++			sensor_reg_data->RegData = read_cmos_sensor(sensor_reg_data->RegAddr);
+ 			break;
+-		case SENSOR_FEATURE_GET_GROUP_COUNT:
+-            *pFeatureReturnPara32++ = 0;
+-            *pFeatureParaLen = 4;	   
+-		    break; 
+ 		case SENSOR_FEATURE_GET_LENS_DRIVER_ID:
+-			*pFeatureReturnPara32 = LENS_DRIVER_ID_DO_NOT_CARE;
+-			*pFeatureParaLen = 4;
++			// get the lens driver ID from EEPROM or just return LENS_DRIVER_ID_DO_NOT_CARE
++			// if EEPROM does not exist in camera module.
++			*feature_return_para_32=LENS_DRIVER_ID_DO_NOT_CARE;
++			*feature_para_len=4;
+ 			break;
++		case SENSOR_FEATURE_SET_VIDEO_MODE:
++			set_video_mode(*feature_data);
++			break; 
+ 		case SENSOR_FEATURE_CHECK_SENSOR_ID:
+-			OV2710_GetSensorID(pFeatureData32);
++			get_imgsensor_id(feature_return_para_32); 
++			break; 
++		case SENSOR_FEATURE_SET_AUTO_FLICKER_MODE:
++			set_auto_flicker_mode((BOOL)*feature_data_16,*(feature_data_16+1));
+ 			break;
+-		case SENSOR_FEATURE_SET_VIDEO_MODE:
+-			if(enable_open_mutex!=0&&open_mutex&OPEN_MUTEX_CAP!=0){
+-				wmt_print("\n\n\n\n\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx detect %s %d\n\n\n\n\n\n",__func__,__LINE__);
+-				break;
+-			}
+-			open_mutex |= OPEN_MUTEX_CAP;
+-			
+-		    OV2710RAWSetVideoMode(*pFeatureData16);
+-		    break; 
+ 		case SENSOR_FEATURE_SET_MAX_FRAME_RATE_BY_SCENARIO:
+-			OV2710SetMaxFramerateByScenario((MSDK_SCENARIO_ID_ENUM)*pFeatureData32, *(pFeatureData32 + 1));
++			set_max_framerate_by_scenario((MSDK_SCENARIO_ID_ENUM)*feature_data, *(feature_data+1));
+ 			break;
+ 		case SENSOR_FEATURE_GET_DEFAULT_FRAME_RATE_BY_SCENARIO:
+-			OV2710GetDefaultFramerateByScenario((MSDK_SCENARIO_ID_ENUM)*pFeatureData, (MUINT32 *)(uintptr_t)(*(pFeatureData + 1)));
+-			break;
+-		case SENSOR_FEATURE_SET_TEST_PATTERN:            			
+-			OV2710SetTestPatternMode((BOOL)*pFeatureData16);            			
++			get_default_framerate_by_scenario((MSDK_SCENARIO_ID_ENUM)*feature_data, (MUINT32 *)(uintptr_t)(*(feature_data+1)));
+ 			break;
+-		//case SENSOR_FEATURE_SET_RAW_3A_CMD:
+-        //    OV2710Set3ACtrl((ACDK_SENSOR_3A_LOCK_ENUM)*pFeatureData32);
+-        //    break;
+-		case SENSOR_FEATURE_GET_SHUTTER_GAIN_AWB_GAIN:
+-			OV2710GetCurAeAwbInfo(*pFeatureData32);			
++		case SENSOR_FEATURE_SET_TEST_PATTERN:
++			set_test_pattern_mode((BOOL)*feature_data);
+ 			break;
+-		case SENSOR_FEATURE_GET_AE_AWB_LOCK_INFO:
+-			OV2710_get_AEAWB_lock((uintptr_t)(*pFeatureData32),(uintptr_t)(*(pFeatureData32+1)));
++		case SENSOR_FEATURE_GET_TEST_PATTERN_CHECKSUM_VALUE: //for factory mode auto testing			 
++			*feature_return_para_32 = imgsensor_info.checksum_value;
++			*feature_para_len=4;							 
++			break;				
++		case SENSOR_FEATURE_SET_FRAMERATE:
++			LOG_INF("current fps :%d\n",  (UINT32)*feature_data);
++			spin_lock(&imgsensor_drv_lock);
++			imgsensor.current_fps = *feature_data;
++			spin_unlock(&imgsensor_drv_lock);		
+ 			break;
+-		case SENSOR_FEATURE_GET_DELAY_INFO:
+-			OV2710_GetDelayInfo(*pFeatureData32);
++		case SENSOR_FEATURE_SET_HDR:
++			LOG_INF("ihdr enable :%d\n", (BOOL)*feature_data);
++			spin_lock(&imgsensor_drv_lock);
++			imgsensor.ihdr_en = (bool)*feature_data;
++			spin_unlock(&imgsensor_drv_lock);		
+ 			break;
+-		case SENSOR_FEATURE_GET_EXIF_INFO:
+-
+-			wmt_print("ov2710raw_sensor %s %d  SENSOR_FEATURE_GET_EXIF_INFO %d\n",__func__,__LINE__,SENSOR_FEATURE_GET_EXIF_INFO);
+-
+-			
+-            OV2710GetExifInfo(*pFeatureData32);
+-            break;
+-		case SENSOR_FEATURE_GET_TEST_PATTERN_CHECKSUM_VALUE:
+-             *pFeatureReturnPara32= OV2710_TEST_PATTERN_CHECKSUM;
+-             *pFeatureParaLen=4;
+-             break;
+-		case SENSOR_FEATURE_AUTOTEST_CMD:
+-		case SENSOR_FEATURE_SET_GAIN:
+-		case SENSOR_FEATURE_SET_FLASHLIGHT:
+-		case SENSOR_FEATURE_SET_ISP_MASTER_CLOCK_FREQ:
+-		case SENSOR_FEATURE_SET_ESHUTTER:
+-		case SENSOR_FEATURE_SET_CCT_REGISTER:
+-		case SENSOR_FEATURE_GET_CCT_REGISTER:
+-		case SENSOR_FEATURE_SET_ENG_REGISTER:
+-		case SENSOR_FEATURE_GET_ENG_REGISTER:
+-		case SENSOR_FEATURE_GET_REGISTER_DEFAULT:
+-		case SENSOR_FEATURE_CAMERA_PARA_TO_SENSOR:
+-		case SENSOR_FEATURE_SENSOR_TO_CAMERA_PARA:
+-		case SENSOR_FEATURE_GET_GROUP_INFO:
+-		case SENSOR_FEATURE_GET_ITEM_INFO:
+-		case SENSOR_FEATURE_SET_ITEM_INFO:
+-		case SENSOR_FEATURE_GET_ENG_INFO:
++		case SENSOR_FEATURE_GET_CROP_INFO:
++			LOG_INF("SENSOR_FEATURE_GET_CROP_INFO scenarioId:%d\n", (UINT32)*feature_data);
++			wininfo = (SENSOR_WINSIZE_INFO_STRUCT *)(uintptr_t)(*(feature_data+1));
++		
++			switch (*feature_data_32) {
++				case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
++					memcpy((void *)wininfo,(void *)&imgsensor_winsize_info[1],sizeof(SENSOR_WINSIZE_INFO_STRUCT));
++					break;	  
++				case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
++					memcpy((void *)wininfo,(void *)&imgsensor_winsize_info[2],sizeof(SENSOR_WINSIZE_INFO_STRUCT));
++					break;
++				case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
++					memcpy((void *)wininfo,(void *)&imgsensor_winsize_info[3],sizeof(SENSOR_WINSIZE_INFO_STRUCT));
++					break;
++				case MSDK_SCENARIO_ID_SLIM_VIDEO:
++					memcpy((void *)wininfo,(void *)&imgsensor_winsize_info[4],sizeof(SENSOR_WINSIZE_INFO_STRUCT));
++					break;
++				case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
++				default:
++					memcpy((void *)wininfo,(void *)&imgsensor_winsize_info[0],sizeof(SENSOR_WINSIZE_INFO_STRUCT));
++					break;
++			}
++		case SENSOR_FEATURE_SET_IHDR_SHUTTER_GAIN:
++			LOG_INF("SENSOR_SET_SENSOR_IHDR LE=%d, SE=%d, Gain=%d\n",(UINT16)*feature_data,(UINT16)*(feature_data+1),(UINT16)*(feature_data+2)); 
++			ihdr_write_shutter_gain((UINT16)*feature_data,(UINT16)*(feature_data+1),(UINT16)*(feature_data+2));	
+ 			break;
+ 		default:
+-			break;			
++			break;
+ 	}
++  
+ 	return ERROR_NONE;
+-}
+-
+-
+-
+-SENSOR_FUNCTION_STRUCT	SensorFuncOV2710=
+-{
+-	OV2710Open,
+-	OV2710GetInfo,
+-	OV2710GetResolution,
+-	OV2710FeatureControl,
+-	OV2710Control,
+-	OV2710Close
++}	/*	feature_control()  */
++
++static SENSOR_FUNCTION_STRUCT sensor_func = {
++	open,
++	get_info,
++	get_resolution,
++	feature_control,
++	control,
++	close
+ };
+ 
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-////////////////////////////////////////////////camera test
+-
+-#include <linux/module.h>
+- #include <linux/init.h>
+- #include <linux/kernel.h>
+-
+- #include <linux/fs.h>		// for basic filesystem
+- #include <linux/proc_fs.h>	// for the proc filesystem
+- #include <linux/seq_file.h>	// for sequence files
+- #include <linux/jiffies.h>	// for jiffies
+-
+- static struct proc_dir_entry* jif_file=NULL;
+-
+- static int 
+- jif_show(struct seq_file *m, void *v)
+- {
+-     seq_printf(m, "%llu\n",
+-         (unsigned long long) get_jiffies_64());
+-     return 0;
+- }
+-
+- static int
+- jif_open(struct inode *inode, struct file *file)
+- {
+-     return single_open(file, jif_show, NULL);
+- }
+-
+-
+-
+- static ssize_t mytest_proc_write(struct file *file, const char __user *buffer,
+-        size_t count, loff_t *pos)
+-{
+- char mode[12];
+- 
+- if (count > 0) {
+-  if (copy_from_user(mode, buffer,12))
+-   return -EFAULT;
+-
+-	printk("================================mode %s\n",mode);
+-
+-
+-	test_value = simple_strtol(mode,NULL, 0);
+-	printk("================================test_value %d\n",test_value);
+-
+-
+-	OV2710_set_param_wb(test_value);
+-
+-	
+-   //mytest_flag = (mode != '0');
+- }
+-
+- return count;
+-}
+-
+- static const struct file_operations jif_fops = {
+-     .owner	= THIS_MODULE,
+-     .open	= jif_open,
+-     .read	= seq_read,
+-     .write  = mytest_proc_write,
+-     .llseek	= seq_lseek,
+-     .release	= single_release,
+- };
+-
+- static int  
+- jif_init(void)
+- {
+- 	printk("%s %d\n",__func__,__LINE__);
+-	if(jif_file!=NULL)
+-		return 0;
+-     jif_file = proc_create("jif", 0, NULL, &jif_fops);
+-
+-     if (!jif_file) {
+-         return -ENOMEM;
+-     }
+-
+-     return 0;
+- }
+-
+-////////////////////////////////////////////////camera test
+-
+-
+-
+-
+-
+-
+-
++/*UINT32 OV2710_MIPI_RAW_SensorInit(PSENSOR_FUNCTION_STRUCT *pfFunc)*/
+ 
+ 
+ MUINT32 OV2710_RAW_SensorInit(PSENSOR_FUNCTION_STRUCT *pfFunc)
+ {
+-	wmt_print("tangh %s %s %d\n",__FILE__,__func__,__LINE__);
+-	//jif_init();
++	/* To Do : Check Sensor status here */
+ 	if (pfFunc!=NULL)
+-		*pfFunc=&SensorFuncOV2710;
+-
++		*pfFunc=&sensor_func;
+ 	return ERROR_NONE;
+-}
+-
++}	/*	OV2710_MIPI_RAW_SensorInit	*/
+ 
+diff --git a/drivers/misc/mediatek/imgsensor/src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.h b/drivers/misc/mediatek/imgsensor/src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.h
+index fa88421..1742e3e 100755
+--- a/drivers/misc/mediatek/imgsensor/src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.h
++++ b/drivers/misc/mediatek/imgsensor/src/mt6735/ov2710_mipi_raw/ov2710raw_Sensor.h
+@@ -1,95 +1,123 @@
+-/* SENSOR FULL SIZE */
+-#ifndef __SENSOR_H
+-#define __SENSOR_H
+-
+-
+-#define TRUE 	0
+-#define FALSE	1
+-
+-typedef enum {
+-    SENSOR_MODE_INIT = 0,
+-    SENSOR_MODE_PREVIEW,
+-    SENSOR_MODE_CAPTURE,
+-    SENSOR_MODE_ZSD
+-} OV2710_SENSOR_MODE;
+-
+-typedef enum _OV2710_OP_TYPE_ {
+-        OV2710_MODE_NONE,
+-        OV2710_MODE_PREVIEW,
+-        OV2710_MODE_CAPTURE,
+-        OV2710_MODE_QCIF_VIDEO,
+-        OV2710_MODE_CIF_VIDEO,
+-        OV2710_MODE_QVGA_VIDEO
+-    } OV2710_OP_TYPE;
+-
+-extern OV2710_OP_TYPE OV2710_g_iOV2710_Mode;
+-
+-#define OV2710_MAX_GAIN							(0x38)
+-#define OV2710_MIN_GAIN							(1)
+-
+-//#define OV2710_ID_REG                          (0x300A)
+-//#define OV2710_INFO_REG                        (0x300B)
+-
+-#if 0 
+-#define OV2710_IMAGE_SENSOR_SVGA_WIDTH          (800)
+-#define OV2710_IMAGE_SENSOR_SVGA_HEIGHT         (600)
+-
+-
+-#define OV2710_IMAGE_SENSOR_UVGA_WITDH        (1600) 
+-#define OV2710_IMAGE_SENSOR_UVGA_HEIGHT       (1200)
+-
+-#else
+-
+-#define _1080P
+-//#define _720P
+-
+-#ifdef _480P
+-#define OV2710_IMAGE_SENSOR_SVGA_WIDTH          (640)
+-#define OV2710_IMAGE_SENSOR_SVGA_HEIGHT         (480)
+-#define PLCK_PREVIEW	800
+-#define PLCK_CAP	800
+-#endif
+-
+-#ifdef _720P
+-#define OV2710_IMAGE_SENSOR_SVGA_WIDTH          (1280)
+-#define OV2710_IMAGE_SENSOR_SVGA_HEIGHT         (720)
+-#define PLCK_PREVIEW	800
+-#define PLCK_CAP	800
+-#endif
+-#ifdef _1080P
+-#define OV2710_IMAGE_SENSOR_SVGA_WIDTH          (1920)
+-#define OV2710_IMAGE_SENSOR_SVGA_HEIGHT         (1080)
+-#define PLCK_PREVIEW	800
+-#define PLCK_CAP	800
+-#endif
+-
+-
+-#define OV2710_IMAGE_SENSOR_UVGA_WITDH        (1920) 
+-#define OV2710_IMAGE_SENSOR_UVGA_HEIGHT       (1080)
+-#endif
+-
+-#define OV2710_PV_PERIOD_PIXEL_NUMS    		(1920)  		
+-#define OV2710_PV_PERIOD_LINE_NUMS     		(1080)   	
+-#define OV2710_FULL_PERIOD_PIXEL_NUMS  		(1951)  	
+-#define OV2710_FULL_PERIOD_LINE_NUMS   		(1232)  	
+-
+-#define OV2710_PV_EXPOSURE_LIMITATION      	(616-4)
+-#define OV2710_FULL_EXPOSURE_LIMITATION    	(1232-4)
+-
+-#define OV2710_PV_GRAB_START_X 				(5)
+-#define OV2710_PV_GRAB_START_Y  			(5)
+-#define OV2710_FULL_GRAB_START_X   			(5)
+-#define OV2710_FULL_GRAB_START_Y	  		(5)
+-
+-#define OV2710_WRITE_ID							    0x6c
+-#define OV2710_READ_ID								0x6d
+-
+-UINT32 OV2710Open(void);
+-UINT32 OV2710GetResolution(MSDK_SENSOR_RESOLUTION_INFO_STRUCT *pSensorResolution);
+-UINT32 OV2710GetInfo(MSDK_SCENARIO_ID_ENUM ScenarioId, MSDK_SENSOR_INFO_STRUCT *pSensorInfo, MSDK_SENSOR_CONFIG_STRUCT *pSensorConfigData);
+-UINT32 OV2710Control(MSDK_SCENARIO_ID_ENUM ScenarioId, MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *pImageWindow, MSDK_SENSOR_CONFIG_STRUCT *pSensorConfigData);
+-UINT32 OV2710FeatureControl(MSDK_SENSOR_FEATURE_ENUM FeatureId, UINT8 *pFeaturePara,UINT32 *pFeatureParaLen);
+-UINT32 OV2710Close(void);
+-UINT32 OV2710_RAW_SensorInit(PSENSOR_FUNCTION_STRUCT *pfFunc);
++/*****************************************************************************
++ *
++ * Filename:
++ * ---------
++ *	 OV2710mipi_Sensor.h
++ *
++ * Project:
++ * --------
++ *	 ALPS
++ *
++ * Description:
++ * ------------
++ *	 CMOS sensor header file
++ *
++ ****************************************************************************/
++#ifndef _OV2710MIPI_SENSOR_H
++#define _OV2710MIPI_SENSOR_H
++
++
++typedef enum{
++	IMGSENSOR_MODE_INIT,
++	IMGSENSOR_MODE_PREVIEW,
++	IMGSENSOR_MODE_CAPTURE,
++	IMGSENSOR_MODE_VIDEO,
++	IMGSENSOR_MODE_HIGH_SPEED_VIDEO,
++	IMGSENSOR_MODE_SLIM_VIDEO,
++} IMGSENSOR_MODE;
++
++typedef struct imgsensor_mode_struct {
++	kal_uint32 pclk;				//record different mode's pclk
++	kal_uint32 linelength;			//record different mode's linelength
++	kal_uint32 framelength;			//record different mode's framelength
++
++	kal_uint8 startx;				//record different mode's startx of grabwindow
++	kal_uint8 starty;				//record different mode's startx of grabwindow
++
++	kal_uint16 grabwindow_width;	//record different mode's width of grabwindow
++	kal_uint16 grabwindow_height;	//record different mode's height of grabwindow
++
++	/*	 following for MIPIDataLowPwr2HighSpeedSettleDelayCount by different scenario	*/
++	kal_uint8 mipi_data_lp2hs_settle_dc;
++
++	/*	 following for GetDefaultFramerateByScenario()	*/
++	kal_uint16 max_framerate;
++	
++} imgsensor_mode_struct;
++
++/* SENSOR PRIVATE STRUCT FOR VARIABLES*/
++typedef struct imgsensor_struct {
++	kal_uint8 mirror;				//mirrorflip information
++
++	kal_uint8 sensor_mode;			//record IMGSENSOR_MODE enum value
++
++	kal_uint32 shutter;				//current shutter
++	kal_uint16 gain;				//current gain
++	
++	kal_uint32 pclk;				//current pclk
++
++	kal_uint32 frame_length;		//current framelength
++	kal_uint32 line_length;			//current linelength
++
++	kal_uint32 min_frame_length;	//current min  framelength to max framerate
++	kal_uint16 dummy_pixel;			//current dummypixel
++	kal_uint16 dummy_line;			//current dummline
++	
++	kal_uint16 current_fps;			//current max fps
++	kal_bool   autoflicker_en;		//record autoflicker enable or disable
++	kal_bool test_pattern;			//record test pattern mode or not
++	MSDK_SCENARIO_ID_ENUM current_scenario_id;//current scenario id
++	kal_uint8  ihdr_en;				//ihdr enable or disable
++	
++	kal_uint8 i2c_write_id;			//record current sensor's i2c write id
++} imgsensor_struct;
++
++/* SENSOR PRIVATE STRUCT FOR CONSTANT*/
++typedef struct imgsensor_info_struct { 
++    kal_uint32 sensor_id;            //record sensor id defined in Kd_imgsensor.h
++	kal_uint32 checksum_value;		//checksum value for Camera Auto Test
++	imgsensor_mode_struct pre;		//preview scenario relative information
++	imgsensor_mode_struct cap;		//capture scenario relative information
++	imgsensor_mode_struct cap1;		//capture for PIP 24fps relative information, capture1 mode must use same framelength, linelength with Capture mode for shutter calculate
++	imgsensor_mode_struct normal_video;//normal video  scenario relative information
++	imgsensor_mode_struct hs_video;	//high speed video scenario relative information
++	imgsensor_mode_struct slim_video;	//slim video for VT scenario relative information
++	
++	kal_uint8  ae_shut_delay_frame;	//shutter delay frame for AE cycle
++	kal_uint8  ae_sensor_gain_delay_frame;	//sensor gain delay frame for AE cycle
++	kal_uint8  ae_ispGain_delay_frame;	//isp gain delay frame for AE cycle
++	kal_uint8  ihdr_support;		//1, support; 0,not support
++	kal_uint8  ihdr_le_firstline;	//1,le first ; 0, se first
++	kal_uint8  sensor_mode_num;		//support sensor mode num
++	
++	kal_uint8  cap_delay_frame;		//enter capture delay frame num
++	kal_uint8  pre_delay_frame;		//enter preview delay frame num
++	kal_uint8  video_delay_frame;	//enter video delay frame num
++	kal_uint8  hs_video_delay_frame;	//enter high speed video  delay frame num
++	kal_uint8  slim_video_delay_frame;	//enter slim video delay frame num
++  
++	kal_uint8  margin;				//sensor framelength & shutter margin 
++	kal_uint32 min_shutter;			//min shutter
++	kal_uint32 max_frame_length;	//max framelength by sensor register's limitation
++
++	kal_uint8  isp_driving_current;	//mclk driving current
++	kal_uint8  sensor_interface_type;//sensor_interface_type
++	kal_uint8  mipi_sensor_type; //0,MIPI_OPHY_NCSI2; 1,MIPI_OPHY_CSI2, default is NCSI2, don't modify this para
++	kal_uint8  mipi_settle_delay_mode; //0, high speed signal auto detect; 1, use settle delay,unit is ns, default is auto detect, don't modify this para
++	kal_uint8  sensor_output_dataformat;//sensor output first pixel color
++	kal_uint8  mclk;				//mclk value, suggest 24 or 26 for 24Mhz or 26Mhz
++	
++	kal_uint8  mipi_lane_num;		//mipi lane num
++	kal_uint8  i2c_addr_table[5];	//record sensor support all write id addr, only supprt 4must end with 0xff
++} imgsensor_info_struct;
++
++/* SENSOR READ/WRITE ID */
++//#define IMGSENSOR_WRITE_ID_1 (0x6c)
++//#define IMGSENSOR_READ_ID_1  (0x6d)
++//#define IMGSENSOR_WRITE_ID_2 (0x20)
++//#define IMGSENSOR_READ_ID_2  (0x21)
++
++extern int iReadRegI2C(u8 *a_pSendData , u16 a_sizeSendData, u8 * a_pRecvData, u16 a_sizeRecvData, u16 i2cId);
++extern int iWriteRegI2C(u8 *a_pSendData , u16 a_sizeSendData, u16 i2cId);
+ 
+ #endif
+diff --git a/drivers/misc/mediatek/mach/mt6735/newmobi6735_66t_v_l1/camera/camera/kd_camera_hw.c b/drivers/misc/mediatek/mach/mt6735/newmobi6735_66t_v_l1/camera/camera/kd_camera_hw.c
+index 3dab936..9783d70 100755
+--- a/drivers/misc/mediatek/mach/mt6735/newmobi6735_66t_v_l1/camera/camera/kd_camera_hw.c
++++ b/drivers/misc/mediatek/mach/mt6735/newmobi6735_66t_v_l1/camera/camera/kd_camera_hw.c
+@@ -73,19 +73,7 @@ u32 pinSet[3][8] = {
+ 
+ 
+                      },
+-					 //nick 20170331 if subcamera
+                      //for sub sensor
+-                     {  CAMERA_CMRST1_PIN,
+-                        CAMERA_CMRST1_PIN_M_GPIO,
+-                        GPIO_OUT_ONE,
+-                        GPIO_OUT_ZERO,
+-                        CAMERA_CMPDN1_PIN,
+-                        CAMERA_CMPDN1_PIN_M_GPIO,
+-                        GPIO_OUT_ONE,
+-                        GPIO_OUT_ZERO,
+-                     },
+-					//nick 20170331 if subcamera
+-						
+                     {  GPIO_CAMERA_INVALID,
+                         GPIO_CAMERA_INVALID,   /* mode */
+                         GPIO_OUT_ONE,               /* ON state */
+@@ -94,10 +82,7 @@ u32 pinSet[3][8] = {
+                         GPIO_CAMERA_INVALID,
+                         GPIO_OUT_ONE,
+                         GPIO_OUT_ZERO,
+-                     }
+-					 //nick 20170331 if main2 
+-					 /*
+-					 ,
++                     },
+                      //for main_2 sensor
+                      {  CAMERA_CMRST1_PIN,
+                         CAMERA_CMRST1_PIN_M_GPIO,
+@@ -108,8 +93,7 @@ u32 pinSet[3][8] = {
+                         GPIO_OUT_ONE,
+                         GPIO_OUT_ZERO,
+                      }
+- 					*/	
+-					// if main2 
++ 
+                    };
+ 
+ 
+@@ -335,7 +319,7 @@ u32 pinSet[3][8] = {
+ 
+             }
+ 
+-            mdelay(2);
++            mdelay(20);
+         }
+ 		else if (currSensorName && (0 == strcmp(SENSOR_DRVNAME_IMX214_MIPI_RAW, currSensorName)))
+         {
+@@ -645,7 +629,7 @@ u32 pinSet[3][8] = {
+     }
+     else {//power OFF
+ 
+-        PK_DBG("[PowerOFF]pinSetIdx:%d\n", pinSetIdx);		
++        PK_DBG("[PowerOFF]pinSetIdx:%d\n", pinSetIdx);
+ 	#if 1
+ 	ISP_MCLK1_EN(0);		
+ 	#else
+@@ -797,7 +781,6 @@ u32 pinSet[3][8] = {
+         }
+         else
+         {
+-			
+             //Set Power Pin low and Reset Pin Low
+             if (GPIO_CAMERA_INVALID != pinSet[pinSetIdx][IDX_PS_CMPDN]) {
+                 if(mt_set_gpio_mode(pinSet[pinSetIdx][IDX_PS_CMPDN],pinSet[pinSetIdx][IDX_PS_CMPDN+IDX_PS_MODE])){PK_DBG("[CAMERA LENS] set gpio mode failed!! (CMPDN)\n");}
+diff --git a/drivers/misc/mediatek/mach/mt6735/newmobi6735_66t_v_l1/camera/camera/kd_camera_hw.h b/drivers/misc/mediatek/mach/mt6735/newmobi6735_66t_v_l1/camera/camera/kd_camera_hw.h
+index 147abdd..fbf9971 100755
+--- a/drivers/misc/mediatek/mach/mt6735/newmobi6735_66t_v_l1/camera/camera/kd_camera_hw.h
++++ b/drivers/misc/mediatek/mach/mt6735/newmobi6735_66t_v_l1/camera/camera/kd_camera_hw.h
+@@ -41,6 +41,6 @@
+ 
+ // Define I2C Bus Num
+ #define SUPPORT_I2C_BUS_NUM1        0
+-#define SUPPORT_I2C_BUS_NUM2        0
++#define SUPPORT_I2C_BUS_NUM2        2	//nick modify for different i2c number
+ 
+ #endif
+-- 
+1.9.1
+
